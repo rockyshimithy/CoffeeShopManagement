@@ -27,7 +27,7 @@ INSTALLED_APPS = [
 
     'apps.workforce',
     'apps.stores',
-    'apps.products',
+    'apps.catalog',
 
 ]
 
