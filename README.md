@@ -1,207 +1,91 @@
-# EmployeeManagement
+# Employee Management
+This is a CRUD (Create, Read, Update, Delete) application for managing employees, developed with Python 3.6, Django, and Django Rest Framework. It uses SQLite as a database.
 
-## App para CRUD de Funcionários - usando python3.6, Django, Django Rest Framework e SQLite
+## Technologies Used
+- **Python**: 3.6
+- **Django**: 2.2.19
+- **Django Rest Framework**: 3.11.2
+- **SQLite**: 3.31.1
 
-Antes de começar, é necessário a criação e ativação de uma VirtualEnv com Python 3.6, para isso recomendo pyenv.
-Após isso, vá para a pasta raiz desse projeto (EmployeeManagement) e siga as instruções abaixo.
+## Prerequisites
+Before you begin, ensure you have the following installed:
+- `pyenv` or `virtualenv` (for managing Python environments)
 
-1) Instale os requisitos do projeto
+## Installation and Setup
 
-    ```shell
-    $ make requirements
-    ```
-
-2) Faça a migração e suba a aplicação
-
-    ```shell
-    $ make migrate_db
-    $ make runserver
-    ```
-
-
-# Testando com curl:
-
-(NOTA: Uma alternativa ao curl é a UI Web para interagir com a API via browser, que é habilitada automaticamente pelo django-rest-framework. É possível fazer todas as requisições - GET, POST, PUT, PATCH e DELETE, acessando a seguinte URL: ``` http://127.0.0.1:8000/employees/ ``` . Basta ir navegando pelos links dos recursos.)
-
-
-- Retorna todas os Funcionários
-
-    ```shell
-    $ curl -iX GET http://127.0.0.1:8000/employees/
-    $ curl -X GET http://127.0.0.1:8000/employees/ | python -m json.tool # pretty view
-    ```
-
-    ```
-    [
-        {
-            "department": "TI",
-            "email": "joao@roberto.com",
-            "name": "Joao Roberto"
-        },
-        {
-            "department": "TI",
-            "email": "joao@roberto2.com",
-            "name": "Joao Roberto"
-        },
-        {
-            "department": "TI",
-            "email": "joao@roberto3.com",
-            "name": "Joao Roberto"
-        },
-        {
-            "department": "TI",
-            "email": "joao@roberto4.com",
-            "name": "Joao Roberto"
-        },
-        {
-            "department": "TI",
-            "email": "joao@roberto5.com",
-            "name": "Joao Roberto"
-        }
-    ]
-
-    ```
-    
- - Retorna um Funcionário especifico, usando sua primary key
-
-    ```shell
-    $ curl -iX GET http://127.0.0.1:8000/employee/1/
-    $ curl -X GET http://127.0.0.1:8000/employee/1/ | python -m json.tool # pretty view
-    ```
-
-    ```
-    HTTP/1.1 200 OK
-    Date: Wed, 16 May 2018 01:59:49 GMT
-    Server: WSGIServer/0.2 CPython/3.6.0
-    Content-Type: application/json
-    Vary: Accept, Cookie
-    Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
-    X-Frame-Options: SAMEORIGIN
-    Content-Length: 68
-    
-    {"name":"Joao Roberto","email":"joao@roberto.com","department":"TI"}
-
-    ```
-
-- Cadastra um novo Funcionário
-
-    ```shell
-    $ curl -iX POST -H "Content-Type: application/json" -d '{"name":"Joao Roberto", "email": "joao@roberto.com", "department": "TI"}' http://127.0.0.1:8000/employees/
-    ```
-
-    ```
-    HTTP/1.1 201 Created
-    Date: Wed, 16 May 2018 01:52:57 GMT
-    Server: WSGIServer/0.2 CPython/3.6.0
-    Content-Type: application/json
-    Vary: Accept, Cookie
-    Allow: GET, POST, HEAD, OPTIONS
-    X-Frame-Options: SAMEORIGIN
-    Content-Length: 68
-    
-    {"name":"Joao Roberto","email":"joao@roberto.com","department":"TI"}
-    ```
-
-- Deleta um Funcionário usando sua Primary Key
-
-    ```shell
-    $ curl -iX DELETE http://127.0.0.1:8000/employee/3/
-    ```
-
-    ```
-    HTTP/1.1 204 No Content
-    Date: Wed, 16 May 2018 01:57:29 GMT
-    Server: WSGIServer/0.2 CPython/3.6.0
-    Vary: Accept, Cookie
-    Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
-    X-Frame-Options: SAMEORIGIN
-    Content-Length: 0
-    ```
-
-- Altera os campos de um Funcionário já cadastrado usando PATCH, exceto a Primary Key
-
-    ```shell
-    $ curl -iX PATCH -H "Content-Type: application/json" -d '{"name":"Ada"}' http://127.0.0.1:8000/employee/1/
-    ```
-
-    ```
-    HTTP/1.1 200 OK
-    Date: Wed, 16 May 2018 02:01:30 GMT
-    Server: WSGIServer/0.2 CPython/3.6.0
-    Content-Type: application/json
-    Vary: Accept, Cookie
-    Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
-    X-Frame-Options: SAMEORIGIN
-    Content-Length: 59
-    
-    {"name":"Ada","email":"joao@roberto.com","department":"TI"}
-    ```
-    
-- Altera os campos de um Funcionário já cadastrado usando PUT, exceto a Primary Key
-
-    ```shell
-    $ curl -iX PUT -H "Content-Type: application/json" -d '{"name":"Ada Lovelace","email":"ada@lovelace.com","department":"CTO"}' http://127.0.0.1:8000/employee/1/
-    ```
-
-    ```
-    HTTP/1.1 200 OK
-    Date: Wed, 16 May 2018 02:07:48 GMT
-    Server: WSGIServer/0.2 CPython/3.6.0
-    Content-Type: application/json
-    Vary: Accept, Cookie
-    Allow: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
-    X-Frame-Options: SAMEORIGIN
-    Content-Length: 69
-    
-    {"name":"Ada Lovelace","email":"ada@lovelace.com","department":"CTO"
-    ```
-
-- Procura por Funcionários usando qualquer um dos seguintes parâmetros (name, email, department)
-
-    ```shell
-    $ curl -X GET http://127.0.0.1:8000/employees/?name=Roberto | python -m json.tool
-    ```
-
-    ```
-    [
-        {
-            "department": "TI",
-            "email": "joao@roberto2.com",
-            "name": "Joao Roberto"
-        },
-        {
-            "department": "TI",
-            "email": "joao@roberto4.com",
-            "name": "Joao Roberto"
-        },
-        {
-            "department": "TI",
-            "email": "joao@roberto5.com",
-            "name": "Joao Roberto"
-        }
-    ]
-    ```
-
-# Painel Django Admin 
-
-Para poder acessar o painel de django admin é necessário criar um "superuser", execute o comando a seguir para gerar um:
-
-```shell
-$ make superuser
+### 1. Clone the repository
+```bash
+git clone https://github.com/rockyshimithy/EmployeeManagement.git
+cd EmployeeManagement
 ```
 
-Acesse a interface através da url http://127.0.0.1:8000/admin 
+### 2. Set up the Python environment and install dependencies
+It is recommended to use `pyenv` or `virtualenv` to create a virtual environment.
 
-# Para observar os testes, rode os seguintes comandos
-
-Para instalar os requirements:
-
-```shell
-$ make requirements_dev
+```bash
+# Example with pyenv
+pyenv install 3.6.15 # or any 3.6.x version
+pyenv local 3.6.15
+python -m venv venv
+source venv/bin/activate
 ```
 
-Para rodar os testes:
+Install the dependencies:
+```bash
+make requirements
+make requirements_dev
+```
 
-```shell
-$ make unit
+### 3. Database Migrations
+Apply database migrations:
+```bash
+make migrate_db
+```
+
+### 4. Create a Superuser (Optional)
+To access the Django admin interface, create a superuser:
+```bash
+make superuser
+```
+
+### 5. Run the Development Server
+```bash
+make runserver
+```
+
+The application will be available at `http://127.0.0.1:8000/`.
+
+## API Endpoints
+
+The following endpoints are available:
+
+### List all employees
+```bash
+curl -X GET http://127.0.0.1:8000/employees/
+```
+
+### Retrieve a specific employee
+```bash
+curl -X GET http://127.0.0.1:8000/employee/<id>/
+```
+
+### Create a new employee
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"name": "John Doe", "email": "john.doe@example.com", "department": "IT"}' http://127.0.0.1:8000/employees/
+```
+
+### Update an existing employee
+```bash
+curl -X PUT -H "Content-Type: application/json" -d '{"name": "Jane Doe", "email": "jane.doe@example.com", "department": "HR"}' http://127.0.0.1:8000/employee/<id>/
+```
+
+### Delete an employee
+```bash
+curl -X DELETE http://127.0.0.1:8000/employee/<id>/
+```
+
+## Running Tests
+To run the unit tests:
+```bash
+make unit
 ```

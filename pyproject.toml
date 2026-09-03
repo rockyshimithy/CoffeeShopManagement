@@ -1,0 +1,22 @@
+[project]
+name = "employee-management"
+version = "0.1.0"
+description = "Modular Enterprise Core API combining Workforce and Public Domain services"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.0",
+    "djangorestframework>=3.15",
+    "django-filter>=24.0",
+    "django-cors-headers>=4.3",
+    "psycopg[binary]>=3.3",
+    "django-environ>=0.11.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-django>=4.8",
+    "hypothesis>=6.100",
+    "ruff>=0.4",
+    "pdbpp>=0.10.3",
+]
