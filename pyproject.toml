@@ -1,7 +1,7 @@
 [project]
-name = "employee-management"
+name = "coffee-shop-management"
 version = "0.1.0"
-description = "Modular Enterprise Core API combining Workforce and Public Domain services"
+description = "Coffee Shop Management combining Workforce, Stores, and Products services"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
