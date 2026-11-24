@@ -15,9 +15,9 @@ DEBUG = env.bool('DEBUG', default=False)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
+    'core.apps.MongoAdminConfig',
+    'core.apps.MongoAuthConfig',
+    'core.apps.MongoContentTypesConfig',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
@@ -25,11 +25,22 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
 
+    'apps.identity',
     'apps.workforce',
     'apps.stores',
     'apps.catalog',
 
 ]
+
+DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
+
+AUTH_USER_MODEL = 'identity.User'
+
+MIGRATION_MODULES = {
+    'admin': 'mongo_migrations.admin',
+    'auth': 'mongo_migrations.auth',
+    'contenttypes': 'mongo_migrations.contenttypes',
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -69,10 +80,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
-    'default': env.db(
-        'DATABASE_URL',
-        default='postgres://postgres:postgres@db:5432/employee_db'
-    )
+    'default': {
+        'ENGINE': 'django_mongodb_backend',
+        'HOST': env(
+            'MONGO_URI',
+            default='mongodb://127.0.0.1:27017/?directConnection=true',
+        ),
+        'NAME': env('MONGO_DB', default='coffeeshop'),
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = [

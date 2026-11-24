@@ -10,22 +10,31 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=1
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/coffeeshop_db
+      - MONGO_URI=mongodb://mongo:27017/?directConnection=true
+      - MONGO_DB=coffeeshop
     depends_on:
-      - db
+      mongo:
+        condition: service_healthy
     tty: true
     stdin_open: true
 
-  db:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=coffeeshop_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval 'try { rs.status() } catch { rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"127.0.0.1:27017\"}]}) }; db.hello().isWritablePrimary' | grep -q true",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
-  postgres_data:
+  mongo_data:
