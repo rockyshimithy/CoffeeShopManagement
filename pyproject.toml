@@ -26,3 +26,10 @@ DJANGO_SETTINGS_MODULE = "core.settings"
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+exclude = ["**/migrations/", "src/mongo_migrations/"]
+
+[tool.ruff.lint]
+# Django's Meta.indexes is a plain list by design, so RUF012 is a false positive there.
+ignore = ["RUF012"]

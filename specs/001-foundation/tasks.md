@@ -24,13 +24,13 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 **Purpose**: Replace the relational stack with the document stack and prepare the project skeleton.
 
-- [ ] T001 Update `pyproject.toml`: set `django==6.1.3`, add `django-mongodb-backend==6.1.0`, raise `djangorestframework>=3.18`, `django-filter>=26.2`, `django-cors-headers>=4.9`, `django-environ>=0.14`; remove `psycopg[binary]`
-- [ ] T002 Add `[tool.pytest.ini_options]` to `pyproject.toml` with `DJANGO_SETTINGS_MODULE = "core.settings"`, `pythonpath = ["src"]`, `testpaths = ["tests"]`, and `addopts = "-q"`
-- [ ] T003 Replace the `db` service with a `mongo` service in `docker-compose.yml`: image `mongo:8.0`, `--replSet rs0 --bind_ip_all`, named volume `mongo_data`, healthcheck that runs `rs.initiate()` when the set is not yet initiated, and `MONGO_URI=mongodb://mongo:27017/?directConnection=true` plus `MONGO_DB=coffeeshop` on `web`
-- [ ] T004 Create `src/core/apps.py` with `MongoAdminConfig`, `MongoAuthConfig`, `MongoContentTypesConfig`, each setting `default_auto_field = "django_mongodb_backend.fields.ObjectIdAutoField"`
-- [ ] T005 Update `src/core/settings.py`: use the three app configs from T004, `DEFAULT_AUTO_FIELD = "django_mongodb_backend.fields.ObjectIdAutoField"`, `DATABASES` with `ENGINE: django_mongodb_backend` and `HOST`/`NAME` from `MONGO_URI`/`MONGO_DB`, `MIGRATION_MODULES` for `admin`, `auth`, `contenttypes` under `mongo_migrations.*`, `AUTH_USER_MODEL = "identity.User"`, and `INSTALLED_APPS` with `apps.identity`, `apps.catalog`, `apps.stores`, and `apps.workforce`
-- [ ] T006 Create the `src/apps/identity/` package skeleton: `__init__.py`, `apps.py` with `IdentityConfig`, and empty `models.py`, `managers.py`, `permissions.py`, `services.py`, `serializers.py`, `views.py`, `urls.py`, `admin.py`, `migrations/__init__.py`
-- [ ] T007 Update `src/core/settings.py` to drop every Postgres reference: search `psycopg`, `postgres://`, `DATABASE_URL`, and `employee_db`, and leave no match
+- [X] T001 Update `pyproject.toml`: set `django==6.1.3`, add `django-mongodb-backend==6.1.0`, raise `djangorestframework>=3.18`, `django-filter>=26.2`, `django-cors-headers>=4.9`, `django-environ>=0.14`; remove `psycopg[binary]`
+- [X] T002 Add `[tool.pytest.ini_options]` to `pyproject.toml` with `DJANGO_SETTINGS_MODULE = "core.settings"`, `pythonpath = ["src"]`, `testpaths = ["tests"]`, and `addopts = "-q"`
+- [X] T003 Replace the `db` service with a `mongo` service in `docker-compose.yml`: image `mongo:8.0`, `--replSet rs0 --bind_ip_all`, named volume `mongo_data`, healthcheck that runs `rs.initiate()` when the set is not yet initiated, and `MONGO_URI=mongodb://mongo:27017/?directConnection=true` plus `MONGO_DB=coffeeshop` on `web`
+- [X] T004 Create `src/core/apps.py` with `MongoAdminConfig`, `MongoAuthConfig`, `MongoContentTypesConfig`, each setting `default_auto_field = "django_mongodb_backend.fields.ObjectIdAutoField"`
+- [X] T005 Update `src/core/settings.py`: use the three app configs from T004, `DEFAULT_AUTO_FIELD = "django_mongodb_backend.fields.ObjectIdAutoField"`, `DATABASES` with `ENGINE: django_mongodb_backend` and `HOST`/`NAME` from `MONGO_URI`/`MONGO_DB`, `MIGRATION_MODULES` for `admin`, `auth`, `contenttypes` under `mongo_migrations.*`, `AUTH_USER_MODEL = "identity.User"`, and `INSTALLED_APPS` with `apps.identity`, `apps.catalog`, `apps.stores`, and `apps.workforce`
+- [X] T006 Create the `src/apps/identity/` package skeleton: `__init__.py`, `apps.py` with `IdentityConfig`, and empty `models.py`, `managers.py`, `permissions.py`, `services.py`, `serializers.py`, `views.py`, `urls.py`, `admin.py`, `migrations/__init__.py`
+- [X] T007 Update `src/core/settings.py` to drop every Postgres reference: search `psycopg`, `postgres://`, `DATABASE_URL`, and `employee_db`, and leave no match
 
 ---
 
@@ -40,21 +40,21 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 **CRITICAL**: Complete this phase before any user story work.
 
-- [ ] T008 [P] Create the `User` model in `src/apps/identity/models.py`: subclass `AbstractUser`, set `username = None`, `email = EmailField(unique=True)`, `USERNAME_FIELD = "email"`, `REQUIRED_FIELDS = []`; add `role` with the five choices `ADMIN`, `REGIONAL_MANAGER`, `MANAGER`, `SUPERVISOR`, `BARISTA`; add `store_ids = ArrayField(ObjectIdField(), default=list)`; add indexes: unique `email`, multikey `store_ids`, compound `(role, is_active)`
-- [ ] T009 [P] Create the `Employee` model in `src/apps/identity/models.py`: `user = OneToOneField(User, on_delete=CASCADE)` and `hire_date = DateField()`; no credentials, no role, no store field; unique index on `user`
-- [ ] T010 Implement `UserManager` in `src/apps/identity/managers.py`: normalize email to lowercase and trimmed, `create_user(email, password, **extra)`, `create_superuser(email, password, **extra)` with `is_staff` and `is_superuser` true; set `objects = UserManager()` on the model
-- [ ] T011 Update `src/apps/stores/models.py`: add an index on `name`, remove the `manager` comment, keep `name` (max 40), `address` (max 100), `postal_code` (max 10)
-- [ ] T012 Remove the legacy employee model and endpoints: delete the `Employee` model from `src/apps/workforce/models.py`, empty `src/apps/workforce/views.py`, `serializers.py`, `urls.py`, keep the app folder and registration for M1, and remove the workforce include from `src/core/urls.py`
-- [ ] T013 Remove the three legacy SQL migrations with `git rm src/apps/catalog/migrations/0001_initial.py src/apps/stores/migrations/0001_initial.py src/apps/workforce/migrations/0001_initial.py`, then regenerate app migrations with `uv run python src/manage.py makemigrations catalog stores identity`
-- [ ] T014 Generate MongoDB migrations for contrib apps: `uv run python src/manage.py makemigrations admin auth contenttypes` into `src/mongo_migrations/`, and confirm `src/mongo_migrations/{admin,auth,contenttypes}/` exist
-- [ ] T015 Create `src/apps/identity/permissions.py` with `ACTIONS`, `can(actor, action, store_id=None)`, `scope_stores(queryset, actor, field="store_id")`, and `require_store_access(actor, store_id)`; `ADMIN` bypasses the store filter, `REGIONAL_MANAGER` uses `store_ids__contains`, every other role does the same, and `require_store_access` raises DRF `PermissionDenied` with `{"detail": "This record is outside your store access."}`
-- [ ] T016 Create `src/apps/identity/services.py` with `add_store_to_regional_managers(store_id)`, `remove_store_from_all_users(store_id)`, `assign_all_stores_to_regional_manager(user)`, and `ensure_not_last_active_admin(user, new_role, new_is_active)`; all use targeted `QuerySet.update()` calls, never read then save
-- [ ] T017 Configure DRF in `src/core/settings.py`: `DEFAULT_AUTHENTICATION_CLASSES = ["rest_framework.authentication.SessionAuthentication"]`, `DEFAULT_PERMISSION_CLASSES = ["rest_framework.permissions.IsAuthenticated"]`, `DEFAULT_PAGINATION_CLASS = "rest_framework.pagination.PageNumberPagination"`, `PAGE_SIZE = 20`, and a page size limit of 100 via a small `src/core/pagination.py`
-- [ ] T018 Create `src/core/urls.py` routing: keep `admin/`, mount `apps.identity.urls`, `apps.stores.urls`, and `apps.catalog.urls` under `api/`, and remove the workforce include
-- [ ] T019 Create `src/apps/identity/admin.py` registering `User` with `list_display = ("email", "role", "is_active")` and `Employee` with `list_display = ("user", "hire_date")`
-- [ ] T020 Create `src/apps/identity/management/commands/create_admin.py`: accepts `--email` and `--password`, refuses when an active `ADMIN` already exists, creates an active admin with `is_staff` and `is_superuser` true
-- [ ] T021 Create `tests/conftest.py` with helpers that build stores, users per role, and authenticated API clients, and a `pytest.mark.django_db` baseline; no network calls
-- [ ] T022 Run `uv run python src/manage.py check` and `uv run python src/manage.py migrate`, then confirm `pytest` collects zero tests without error
+- [X] T008 [P] Create the `User` model in `src/apps/identity/models.py`: subclass `AbstractUser`, set `username = None`, `email = EmailField(unique=True)`, `USERNAME_FIELD = "email"`, `REQUIRED_FIELDS = []`; add `role` with the five choices `ADMIN`, `REGIONAL_MANAGER`, `MANAGER`, `SUPERVISOR`, `BARISTA`; add `store_ids = ArrayField(ObjectIdField(), default=list)`; add indexes: unique `email`, multikey `store_ids`, compound `(role, is_active)`
+- [X] T009 [P] Create the `Employee` model in `src/apps/identity/models.py`: `user = OneToOneField(User, on_delete=CASCADE)` and `hire_date = DateField()`; no credentials, no role, no store field; unique index on `user`
+- [X] T010 Implement `UserManager` in `src/apps/identity/managers.py`: normalize email to lowercase and trimmed, `create_user(email, password, **extra)`, `create_superuser(email, password, **extra)` with `is_staff` and `is_superuser` true; set `objects = UserManager()` on the model
+- [X] T011 Update `src/apps/stores/models.py`: add an index on `name`, remove the `manager` comment, keep `name` (max 40), `address` (max 100), `postal_code` (max 10)
+- [X] T012 Remove the legacy employee model and endpoints: delete the `Employee` model from `src/apps/workforce/models.py`, empty `src/apps/workforce/views.py`, `serializers.py`, `urls.py`, keep the app folder and registration for M1, and remove the workforce include from `src/core/urls.py`
+- [X] T013 Remove the three legacy SQL migrations with `git rm src/apps/catalog/migrations/0001_initial.py src/apps/stores/migrations/0001_initial.py src/apps/workforce/migrations/0001_initial.py`, then regenerate app migrations with `uv run python src/manage.py makemigrations catalog stores identity`
+- [X] T014 Generate MongoDB migrations for contrib apps: `uv run python src/manage.py makemigrations admin auth contenttypes` into `src/mongo_migrations/`, and confirm `src/mongo_migrations/{admin,auth,contenttypes}/` exist
+- [X] T015 Create `src/apps/identity/permissions.py` with `ACTIONS`, `can(actor, action, store_id=None)`, `scope_stores(queryset, actor, field="store_id")`, and `require_store_access(actor, store_id)`; `ADMIN` bypasses the store filter, `REGIONAL_MANAGER` uses `store_ids__contains`, every other role does the same, and `require_store_access` raises DRF `PermissionDenied` with `{"detail": "This record is outside your store access."}`
+- [X] T016 Create `src/apps/identity/services.py` with `add_store_to_regional_managers(store_id)`, `remove_store_from_all_users(store_id)`, `assign_all_stores_to_regional_manager(user)`, and `ensure_not_last_active_admin(user, new_role, new_is_active)`; all use targeted `QuerySet.update()` calls, never read then save
+- [X] T017 Configure DRF in `src/core/settings.py`: `DEFAULT_AUTHENTICATION_CLASSES = ["rest_framework.authentication.SessionAuthentication"]`, `DEFAULT_PERMISSION_CLASSES = ["rest_framework.permissions.IsAuthenticated"]`, `DEFAULT_PAGINATION_CLASS = "rest_framework.pagination.PageNumberPagination"`, `PAGE_SIZE = 20`, and a page size limit of 100 via a small `src/core/pagination.py`
+- [X] T018 Create `src/core/urls.py` routing: keep `admin/`, mount `apps.identity.urls`, `apps.stores.urls`, and `apps.catalog.urls` under `api/`, and remove the workforce include
+- [X] T019 Create `src/apps/identity/admin.py` registering `User` with `list_display = ("email", "role", "is_active")` and `Employee` with `list_display = ("user", "hire_date")`
+- [X] T020 Create `src/apps/identity/management/commands/create_admin.py`: accepts `--email` and `--password`, refuses when an active `ADMIN` already exists, creates an active admin with `is_staff` and `is_superuser` true
+- [X] T021 Create `tests/conftest.py` with helpers that build stores, users per role, and authenticated API clients, and a `pytest.mark.django_db` baseline; no network calls
+- [X] T022 Run `uv run python src/manage.py check` and `uv run python src/manage.py migrate`, then confirm `pytest` collects zero tests without error
 
 **Checkpoint**: The database is MongoDB, migrations apply, the helper exists, and the test harness runs.
 
@@ -68,16 +68,16 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 ### Tests for User Story 1
 
-- [ ] T023 [P] [US1] Write `tests/test_auth.py` covering: successful login sets a session; wrong password and unknown email both return 401 with `{"detail": "Invalid email or password."}`; a deactivated user returns 401; `GET /api/auth/me/` returns email, role, and `store_ids`; `PATCH /api/auth/me/` rejects `role`, `store_ids`, and `is_active` with 400; logout returns 204 and the next `me` call returns 401
-- [ ] T024 [US1] Run the T023 tests and confirm they fail for the expected reason before implementing
+- [X] T023 [P] [US1] Write `tests/test_auth.py` covering: successful login sets a session; wrong password and unknown email both return 401 with `{"detail": "Invalid email or password."}`; a deactivated user returns 401; `GET /api/auth/me/` returns email, role, and `store_ids`; `PATCH /api/auth/me/` rejects `role`, `store_ids`, and `is_active` with 400; logout returns 204 and the next `me` call returns 401
+- [X] T024 [US1] Run the T023 tests and confirm they fail for the expected reason before implementing
 
 ### Implementation for User Story 1
 
-- [ ] T025 [US1] Add `LoginSerializer` and `AccountProfileSerializer` to `src/apps/identity/serializers.py`; the profile serializer returns `id`, `email`, `role`, `store_ids`, `is_active`, `first_name`, `last_name`, `date_joined`, and never `password`
-- [ ] T026 [US1] Implement `LoginView`, `LogoutView`, and `MeView` in `src/apps/identity/views.py`: login uses `django.contrib.auth.authenticate` and `login`, logout calls `logout`, `MeView` allows `GET` and `PATCH` with only `email`, `password`, `first_name`, `last_name` writable
-- [ ] T027 [US1] Create `src/apps/identity/urls.py` with `auth/login/`, `auth/logout/`, and `auth/me/`, and include it from `src/core/urls.py` under `api/`
-- [ ] T028 [US1] Set session rules in `src/core/settings.py`: `SESSION_COOKIE_AGE = 28800`, `SESSION_SAVE_EVERY_REQUEST = True`, `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_SAMESITE = "Lax"`
-- [ ] T029 [US1] Run `uv run pytest tests/test_auth.py` and confirm every scenario passes, including the deactivated-account case
+- [X] T025 [US1] Add `LoginSerializer` and `AccountProfileSerializer` to `src/apps/identity/serializers.py`; the profile serializer returns `id`, `email`, `role`, `store_ids`, `is_active`, `first_name`, `last_name`, `date_joined`, and never `password`
+- [X] T026 [US1] Implement `LoginView`, `LogoutView`, and `MeView` in `src/apps/identity/views.py`: login uses `django.contrib.auth.authenticate` and `login`, logout calls `logout`, `MeView` allows `GET` and `PATCH` with only `email`, `password`, `first_name`, `last_name` writable
+- [X] T027 [US1] Create `src/apps/identity/urls.py` with `auth/login/`, `auth/logout/`, and `auth/me/`, and include it from `src/core/urls.py` under `api/`
+- [X] T028 [US1] Set session rules in `src/core/settings.py`: `SESSION_COOKIE_AGE = 28800`, `SESSION_SAVE_EVERY_REQUEST = True`, `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_SAMESITE = "Lax"`
+- [X] T029 [US1] Run `uv run pytest tests/test_auth.py` and confirm every scenario passes, including the deactivated-account case
 
 **Checkpoint**: US1 works alone. A signed-in user can read and update their own profile.
 

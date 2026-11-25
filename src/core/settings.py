@@ -55,8 +55,21 @@ MIDDLEWARE = [
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
+SESSION_COOKIE_AGE = 28800
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+
 REST_FRAMEWORK = {
-    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'core.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
+    'PAGE_SIZE': 20,
 }
 
 ROOT_URLCONF = 'core.urls'
