@@ -17,10 +17,14 @@ ACTIONS = frozenset(
         "account.read",
         "account.change",
         "account.deactivate",
+        "account.delete",
         "employee.read",
         "employee.create",
         "employee.change",
-        "shift.schedule",
+        "shift.read",
+        "shift.create",
+        "shift.change",
+        "shift.delete",
     }
 )
 
@@ -48,6 +52,9 @@ ROLE_ACTIONS = {
         User.Role.REGIONAL_MANAGER,
         User.Role.MANAGER,
     },
+    "account.delete": {
+        User.Role.ADMIN,
+    },
     "employee.read": {
         User.Role.ADMIN,
         User.Role.REGIONAL_MANAGER,
@@ -65,7 +72,26 @@ ROLE_ACTIONS = {
         User.Role.REGIONAL_MANAGER,
         User.Role.MANAGER,
     },
-    "shift.schedule": {
+    "shift.read": {
+        User.Role.ADMIN,
+        User.Role.REGIONAL_MANAGER,
+        User.Role.MANAGER,
+        User.Role.SUPERVISOR,
+        User.Role.BARISTA,
+    },
+    "shift.create": {
+        User.Role.ADMIN,
+        User.Role.REGIONAL_MANAGER,
+        User.Role.MANAGER,
+        User.Role.SUPERVISOR,
+    },
+    "shift.change": {
+        User.Role.ADMIN,
+        User.Role.REGIONAL_MANAGER,
+        User.Role.MANAGER,
+        User.Role.SUPERVISOR,
+    },
+    "shift.delete": {
         User.Role.ADMIN,
         User.Role.REGIONAL_MANAGER,
         User.Role.MANAGER,
@@ -115,6 +141,24 @@ def require_store_access(actor: User, store_id: ObjectId | None) -> None:
         return
     if store_id is None or store_id not in actor.store_ids:
         raise PermissionDenied(STORE_DENIED)
+
+
+def scope_store_ids(actor: User, store_id: ObjectId | None = None) -> list[ObjectId]:
+    """The store ids a scoped query will actually see.
+
+    One store when ``store_id`` is given, after checking the actor may reach it.
+    Otherwise the actor's assignments, and every store for ADMIN. This keeps the
+    ADMIN bypass inside the helper, so no other module compares a role to decide
+    what a query may see.
+    """
+    if store_id is not None:
+        require_store_access(actor, store_id)
+        return [store_id]
+    if actor.role == User.Role.ADMIN:
+        from apps.stores.services import all_store_ids
+
+        return list(all_store_ids())
+    return list(actor.store_ids)
 
 
 def require_action(actor: User, action: str, store_id: ObjectId | None = None) -> None:

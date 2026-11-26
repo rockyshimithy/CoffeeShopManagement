@@ -20,6 +20,11 @@ def all_store_ids() -> QuerySet:
     return Store.objects.values_list("pk", flat=True)
 
 
+def store_exists(store_id: ObjectId) -> bool:
+    """Public read for other contexts: does this store exist?"""
+    return Store.objects.filter(pk=store_id).exists()
+
+
 def create_store(actor: User, data: dict) -> Store:
     """Create a store and give it to every regional manager.
 

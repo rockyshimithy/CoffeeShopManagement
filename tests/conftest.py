@@ -6,14 +6,19 @@ connection: the tests talk to the same MongoDB the app uses.
 """
 
 import itertools
+from datetime import UTC, datetime
 
 import pytest
 from rest_framework.test import APIClient
 
 from apps.identity.models import Employee, User
 from apps.stores.models import Store
+from apps.workforce.models import Shift
 
 PASSWORD = "test-password-123"
+
+SHIFT_START = datetime(2026, 11, 30, 8, 0, tzinfo=UTC)
+SHIFT_END = datetime(2026, 11, 30, 16, 0, tzinfo=UTC)
 
 _emails = itertools.count(1)
 _names = itertools.count(1)
@@ -52,6 +57,19 @@ def make_employee(db, make_user):
     def _make(user=None, hire_date="2026-11-01", **user_extra):
         return Employee.objects.create(
             user=user or make_user(**user_extra), hire_date=hire_date
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_shift(db, make_employee, make_store):
+    def _make(employee=None, store=None, starts_at=SHIFT_START, ends_at=SHIFT_END):
+        return Shift.objects.create(
+            employee=employee or make_employee(),
+            store=store or make_store(),
+            starts_at=starts_at,
+            ends_at=ends_at,
         )
 
     return _make

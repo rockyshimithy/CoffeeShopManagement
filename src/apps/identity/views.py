@@ -26,6 +26,7 @@ from .serializers import (
 from .services import (
     create_account,
     create_employee,
+    delete_account,
     update_account,
     update_employee,
     visible_accounts,
@@ -109,6 +110,10 @@ class AccountDetailView(AccountAccessMixin, generics.GenericAPIView):
         target = self.get_object()
         user = update_account(request.user, target, request.data)
         return Response(AccountReadSerializer(user).data)
+
+    def delete(self, request, *args, **kwargs):
+        delete_account(request.user, self.get_object())
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ActorContextMixin:

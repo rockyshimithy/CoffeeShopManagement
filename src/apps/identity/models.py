@@ -39,3 +39,19 @@ class Employee(models.Model):
 
     def __str__(self):
         return f"{self.user} ({self.hire_date})"
+
+
+class AdminGuard(models.Model):
+    """One row that serializes every change which can remove an active admin.
+
+    The last-admin rule reads a count and then writes. Under snapshot isolation
+    two concurrent removals each read a count that still contains the other
+    target, so both pass. Writing this row inside the transaction gives them a
+    document in common, MongoDB aborts one, and the replay re-counts.
+    """
+
+    key = models.CharField(max_length=16, unique=True, default="last-admin")
+    revision = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.key}: {self.revision}"

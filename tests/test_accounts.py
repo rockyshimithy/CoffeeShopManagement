@@ -1,9 +1,13 @@
 """User Story 2: staff accounts, created and managed inside role limits."""
 
+import threading
+
 import pytest
+from django.db import connections
 from rest_framework.test import APIClient
 
-from apps.identity.models import User
+from apps.identity.models import Employee, User
+from apps.workforce.models import Shift
 
 PASSWORD = "test-password-123"
 ACCOUNTS = "/api/accounts/"
@@ -505,3 +509,149 @@ def test_other_roles_cannot_reach_accounts(as_user, make_user, role):
 
 def test_anonymous_is_401(api_client):
     assert api_client.get(ACCOUNTS).status_code == 401
+
+
+# Deleting an account (User Story 4)
+
+SCHEDULE = "/api/shifts/"
+WINDOW = {"from": "2026-11-30T00:00:00Z", "to": "2026-12-07T00:00:00Z"}
+
+
+def test_admin_deletes_an_account_with_its_profile_and_shifts(
+    as_user, admin, barista, downtown, make_employee, make_shift
+):
+    profile = make_employee(user=barista)
+    shift = make_shift(employee=profile, store=downtown)
+
+    response = as_user(admin).delete(detail_url(barista))
+
+    assert response.status_code == 204
+    assert User.objects.filter(pk=barista.pk).exists() is False
+    assert Employee.objects.filter(pk=profile.pk).exists() is False
+    assert Shift.objects.filter(pk=shift.pk).exists() is False
+    assert as_user(admin).get(detail_url(barista)).status_code == 404
+
+
+def test_an_account_without_a_profile_deletes_alone(as_user, admin, make_user):
+    lone = make_user(role=User.Role.BARISTA, email="lone@example.com")
+
+    response = as_user(admin).delete(detail_url(lone))
+
+    assert response.status_code == 204
+    assert User.objects.filter(pk=lone.pk).exists() is False
+
+
+def test_only_an_admin_deletes(as_user, manager, regional, barista):
+    for actor in (manager, regional, barista):
+        response = as_user(actor).delete(detail_url(barista))
+        assert response.status_code == 403
+        assert response.data == {"detail": ROLE_DENIED}
+
+    assert User.objects.filter(pk=barista.pk).exists() is True
+
+
+def test_deleting_an_unknown_account_is_404(as_user, admin):
+    response = as_user(admin).delete(f"{ACCOUNTS}ffffffffffffffffffffffff/")
+
+    assert response.status_code == 404
+
+
+def test_deleting_with_a_malformed_id_is_404(as_user, admin):
+    response = as_user(admin).delete(f"{ACCOUNTS}not-an-id/")
+
+    assert response.status_code == 404
+
+
+def test_the_last_active_admin_cannot_be_deleted(as_user, admin):
+    response = as_user(admin).delete(detail_url(admin))
+
+    assert response.status_code == 403
+    assert response.data == {"detail": LAST_ADMIN_DENIED}
+    assert User.objects.filter(pk=admin.pk).exists() is True
+
+
+def test_an_admin_may_delete_their_own_account_beside_another(
+    as_user, admin, make_user
+):
+    make_user(role=User.Role.ADMIN, email="other-admin@example.com")
+
+    response = as_user(admin).delete(detail_url(admin))
+
+    assert response.status_code == 204
+    assert User.objects.filter(role=User.Role.ADMIN, is_active=True).count() == 1
+
+
+def test_the_schedule_stops_listing_a_deleted_person(
+    as_user, admin, manager, barista, downtown, make_employee, make_shift
+):
+    profile = make_employee(user=barista)
+    make_shift(employee=profile, store=downtown)
+
+    before = as_user(manager).get(SCHEDULE, WINDOW)
+    as_user(admin).delete(detail_url(barista))
+    after = as_user(manager).get(SCHEDULE, WINDOW)
+
+    assert before.data["count"] == 1
+    assert after.data["count"] == 0
+
+
+# Two removals at once (FR-027, SC-008)
+
+
+def _run_together(action, first, second):
+    """Run one call as each account against the other, starting at the same time."""
+    barrier = threading.Barrier(2)
+    statuses = []
+    lock = threading.Lock()
+
+    def call(actor, target):
+        client = APIClient()
+        client.force_login(actor)
+        try:
+            barrier.wait(timeout=10)
+            response = action(client, target)
+            with lock:
+                statuses.append(response.status_code)
+        finally:
+            connections.close_all()
+
+    threads = [
+        threading.Thread(target=call, args=(first, second)),
+        threading.Thread(target=call, args=(second, first)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    return statuses
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_admins_deleting_each_other_leave_one(admin, make_user):
+    peer = make_user(role=User.Role.ADMIN, email="peer@example.com")
+
+    statuses = _run_together(
+        lambda client, target: client.delete(detail_url(target)), admin, peer
+    )
+
+    assert len(statuses) == 2
+    assert statuses.count(204) == 1
+    assert set(statuses) <= {204, 401, 403}
+    assert User.objects.filter(role=User.Role.ADMIN, is_active=True).count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_admins_deactivating_each_other_leave_one(admin, make_user):
+    peer = make_user(role=User.Role.ADMIN, email="peer@example.com")
+
+    statuses = _run_together(
+        lambda client, target: client.patch(
+            detail_url(target), {"is_active": False}, format="json"
+        ),
+        admin,
+        peer,
+    )
+
+    assert statuses.count(200) == 1
+    assert set(statuses) <= {200, 401, 403}
+    assert User.objects.filter(role=User.Role.ADMIN, is_active=True).count() == 1

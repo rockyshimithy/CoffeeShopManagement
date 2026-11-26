@@ -1,10 +1,13 @@
 from bson import ObjectId
-from django.db.models import Q, QuerySet
+from django.db.models import F, Q, QuerySet
+from django.http import Http404
 from django_mongodb_backend.transaction import atomic
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from .models import Employee, User
+from core.transactions import retry_on_conflict
+
+from .models import AdminGuard, Employee, User
 from .permissions import (
     ACCOUNT_MANAGED_ROLES,
     LAST_ADMIN_DENIED,
@@ -15,6 +18,8 @@ from .permissions import (
     scope_stores,
 )
 from .serializers import AccountWriteSerializer, EmployeeSerializer
+
+ADMIN_GUARD_KEY = "last-admin"
 
 
 def create_account(actor: User, data: dict) -> User:
@@ -29,7 +34,12 @@ def create_account(actor: User, data: dict) -> User:
 
 
 def update_account(actor: User, user: User, data: dict) -> User:
-    """Change one account, guarding the last admin and the actor's limits."""
+    """Change one account, guarding the last admin and the actor's limits.
+
+    The guard reads a count and the save writes, so both run in one transaction
+    with the guard row bumped first. That is what stops two concurrent removals
+    from leaving zero admins (FR-027).
+    """
     require_account_change(actor, user)
     serializer = AccountWriteSerializer(
         user, data=data, partial=True, context={"actor": actor}
@@ -37,11 +47,23 @@ def update_account(actor: User, user: User, data: dict) -> User:
     serializer.is_valid(raise_exception=True)
     new_role = serializer.validated_data.get("role", user.role)
     new_is_active = serializer.validated_data.get("is_active", user.is_active)
-    ensure_not_last_active_admin(user, new_role, new_is_active)
-    saved = serializer.save()
-    if saved.role == User.Role.REGIONAL_MANAGER:
-        assign_all_stores_to_regional_manager(saved)
-        saved.refresh_from_db()
+    keeps_admin = new_role == User.Role.ADMIN and new_is_active
+    user_id = user.pk
+
+    def operation():
+        with atomic():
+            target = User.objects.filter(pk=user_id).first()
+            if target is None:
+                raise Http404
+            _take_admin_slot()
+            ensure_admin_remains(target, keeps_admin=keeps_admin)
+            saved = serializer.save()
+            if saved.role == User.Role.REGIONAL_MANAGER:
+                assign_all_stores_to_regional_manager(saved)
+            return saved
+
+    saved = retry_on_conflict(operation)
+    saved.refresh_from_db()
     return saved
 
 
@@ -100,6 +122,26 @@ def visible_accounts(actor: User) -> QuerySet[User]:
     return scoped.filter(Q(role__in=ACCOUNT_MANAGED_ROLES) | Q(pk=actor.pk))
 
 
+def employee_store_ids(employee_id: ObjectId) -> list[ObjectId] | None:
+    """Public read for workforce: the stores one employee profile belongs to.
+
+    ``None`` means no profile has that id. The stores come from the linked
+    account, which is the single source of scope for a person. Two plain finds
+    instead of a join, so this stays usable inside a transaction.
+    """
+    user_id = (
+        Employee.objects.filter(pk=employee_id)
+        .values_list("user_id", flat=True)
+        .first()
+    )
+    if user_id is None:
+        return None
+    store_ids = (
+        User.objects.filter(pk=user_id).values_list("store_ids", flat=True).first()
+    )
+    return list(store_ids or [])
+
+
 def _update_store_ids(user_id: ObjectId, store_ids: list[ObjectId]) -> None:
     User.objects.filter(pk=user_id).update(store_ids=store_ids)
 
@@ -139,19 +181,73 @@ def assign_all_stores_to_regional_manager(user: User) -> None:
     _update_store_ids(user.pk, list(all_store_ids()))
 
 
-def ensure_not_last_active_admin(
-    user: User, new_role: str, new_is_active: bool
-) -> None:
-    """Refuse to remove the only active admin from the admin role."""
+def ensure_admin_remains(user: User, *, keeps_admin: bool) -> None:
+    """Refuse to remove the only active admin from the admin role.
+
+    Must be called inside the transaction that already took the admin slot, so
+    the count cannot be stale against a concurrent removal.
+    """
     if user.role != User.Role.ADMIN or not user.is_active:
         return
-    keeps_admin = new_role == User.Role.ADMIN and new_is_active
     if keeps_admin:
         return
+    # exists() and not count(): this backend compiles count() with a $unionWith
+    # stage, which MongoDB refuses inside a multi-document transaction.
     others = (
         User.objects.filter(role=User.Role.ADMIN, is_active=True)
         .exclude(pk=user.pk)
-        .count()
+        .exists()
     )
-    if others == 0:
+    if not others:
         raise PermissionDenied(LAST_ADMIN_DENIED)
+
+
+def _take_admin_slot() -> None:
+    """Bump the one row every admin-removing transaction writes.
+
+    A concurrent create that loses the race raises a duplicate key error, which
+    is a ``DatabaseError``, so the caller's ``retry_on_conflict`` replays and
+    takes the update path.
+    """
+    bumped = AdminGuard.objects.filter(key=ADMIN_GUARD_KEY).update(
+        revision=F("revision") + 1
+    )
+    if not bumped:
+        AdminGuard.objects.create(key=ADMIN_GUARD_KEY)
+
+
+def delete_account(actor: User, user: User) -> None:
+    """Delete an account, its employee profile, and that profile's shifts.
+
+    The profile and the shifts leave through the cascades declared on the
+    models. The store revisions are bumped by hand, because a cascade writes no
+    revision and a cached schedule would otherwise keep naming the deleted
+    person.
+    """
+    if not can(actor, "account.delete"):
+        raise PermissionDenied(ROLE_DENIED)
+    user_id = user.pk
+
+    def operation():
+        with atomic():
+            target = User.objects.filter(pk=user_id).first()
+            if target is None:
+                raise Http404
+            _take_admin_slot()
+            ensure_admin_remains(target, keeps_admin=False)
+            _bump_stores_of_deleted_shifts(user_id)
+            User.objects.filter(pk=user_id).delete()
+
+    return retry_on_conflict(operation)
+
+
+def _bump_stores_of_deleted_shifts(user_id: ObjectId) -> None:
+    """Move the cache token of every store that is about to lose a shift."""
+    from apps.workforce.services import bump_store_revisions, shift_store_ids
+
+    profile = Employee.objects.filter(user_id=user_id).first()
+    if profile is None:
+        return
+    store_ids = shift_store_ids(profile.pk)
+    if store_ids:
+        bump_store_revisions(store_ids)
