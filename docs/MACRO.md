@@ -1,6 +1,6 @@
 # CoffeeShopManagement: Macro Concept
 
-Version: 0.5 | Created: 2026-11-20 | Updated: 2026-11-24 | Owner: Kyaor
+Version: 0.6 | Created: 2026-11-20 | Updated: 2026-11-26 | Owner: Kyaor
 
 This document is the project wide view. It is deliberately not a feature spec. Feature
 specs live in `specs/NNN-slug/` and follow the chain required by
@@ -117,7 +117,7 @@ unexplained loss, and it falls out of the two without inventing a `SHRINKAGE` ty
 | 17 | MongoDB through `django-mongodb-backend`, with `ObjectIdAutoField` on every model. | 2026-11-23 | Documents fit stock history, and the backend keeps Django auth, admin, and the ORM. |
 | 18 | `Stock` holds `current_stock` and `last_count`. `StockEvent` holds every movement and count in its own collection. | 2026-11-23 | M3 needs events across items, which embedded arrays cannot serve without scanning every document. |
 | 19 | Stock changes only through one service function, inside a transaction, never by loading a value, editing it in Python, and saving it. | 2026-11-23 | The number and the events are two writes, so that function is the only thing keeping them in agreement. |
-| 20 | Related data on list endpoints loads by manual batch after pagination. Index on `(store_id, starts_at)`. The schedule is cached. | 2026-11-23 | `prefetch_related()` is unsupported on this backend, so the per row query has to be prevented by hand. |
+| 20 | Related data on list endpoints loads by manual batch after pagination. Index on `(store_id, starts_at)`. The schedule is cached. An endpoint that must order by a related field may join instead, because a page cannot be re-sorted after pagination. | 2026-11-23, amended 2026-11-26 | `prefetch_related()` is unsupported on this backend, so the per row query has to be prevented by hand. A sort on a joined field cannot use an index, so it is only allowed where the window and the store assignments bound the working set. |
 | 21 | Transactions use `django_mongodb_backend.transaction.atomic`, never `django.db.transaction`. | 2026-11-23 | Django's transaction API is a documented no-op here, so the idiomatic import fails silently. |
 | 22 | `User` and `Employee` are two collections. A customer is a `User` with no `Employee` document. | 2026-11-23 | Keeps the door open for the `CUSTOMER` role without null employment fields. |
 | 23 | A person can work at several stores. Access comes from `role` plus `store_ids`. `Store.manager` is dropped. | 2026-11-23 | Two sources of truth for "who runs this store" would disagree eventually. |
