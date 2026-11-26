@@ -4,6 +4,7 @@ from .models import User
 
 STORE_DENIED = "This record is outside your store access."
 ROLE_DENIED = "Your role may not perform this action."
+LAST_ADMIN_DENIED = "The last active admin cannot be deactivated or demoted."
 
 ACTIONS = frozenset(
     {

@@ -5,6 +5,7 @@ help:
 	@echo '                                                              '
 	@echo 'Usage:                                                        '
 	@echo '    make clean              Remove python compiled files      '
+	@echo '    make lint               Run ruff check and format check     '
 # 	@echo '    make requirements       Install required packages         '
 # 	@echo '    make requirements_dev   Install required packages to Dev  '
 # 	@echo '    make unit               Run unit tests                    '
@@ -14,7 +15,11 @@ help:
 	@echo '                                                              '
 
 
-.PHONY: clean clean-pyc
+.PHONY: clean clean-pyc lint
+
+lint:
+	uv run ruff check .
+	uv run ruff format --check .
 
 clean-pyc:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class WorkforceConfig(AppConfig):
-    name = 'apps.workforce'
+    name = "apps.workforce"

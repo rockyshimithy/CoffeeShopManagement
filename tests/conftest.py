@@ -1,8 +1,8 @@
 """Shared fixtures for the M0 test suites.
 
-Every test gets the database, so a module never has to repeat
-``pytest.mark.django_db``. Nothing here opens a network connection: the tests
-talk to the same MongoDB the app uses.
+The factory fixtures below request ``db`` in their own signatures, so a test gets
+database access by naming the factory it uses. Nothing here opens a network
+connection: the tests talk to the same MongoDB the app uses.
 """
 
 import itertools
@@ -17,11 +17,6 @@ PASSWORD = "test-password-123"
 
 _emails = itertools.count(1)
 _names = itertools.count(1)
-
-
-@pytest.fixture(autouse=True)
-def _database(db):
-    """Baseline database access for every test in this project."""
 
 
 @pytest.fixture

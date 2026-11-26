@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from core.fields import ObjectIdField
+
 from .models import User
 
 READ_ONLY_PROFILE_FIELDS = ("role", "store_ids", "is_active")
@@ -14,8 +16,8 @@ class LoginSerializer(serializers.Serializer):
 
 
 class AccountProfileSerializer(serializers.ModelSerializer):
-    id = serializers.CharField(read_only=True)
-    store_ids = serializers.ListField(child=serializers.CharField(), read_only=True)
+    id = ObjectIdField(read_only=True)
+    store_ids = serializers.ListField(child=ObjectIdField(), read_only=True)
     password = serializers.CharField(
         write_only=True, required=False, trim_whitespace=False
     )

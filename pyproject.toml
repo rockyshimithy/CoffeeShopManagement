@@ -28,7 +28,7 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.ruff]
-exclude = ["**/migrations/", "src/mongo_migrations/"]
+exclude = ["**/migrations/", "src/mongo_migrations/", "specs/"]
 
 [tool.ruff.lint]
 # Django's Meta.indexes is a plain list by design, so RUF012 is a false positive there.

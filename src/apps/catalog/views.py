@@ -1,8 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
-from rest_framework.response import Response
-from rest_framework.reverse import reverse
-
 
 from .filters import ProductFilter
 from .models import Product
@@ -14,17 +11,17 @@ class ProductList(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductFilter
-    name = 'product-list'
+    name = "product-list"
 
 
 class ProductDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    name = 'product-detail'
+    name = "product-detail"
 
 
 class ApiRoot(generics.GenericAPIView):
-    name = 'api-root'
+    name = "api-root"
 
     # def get(self, request, *args, **kwargs):
     #     return Response({

@@ -10,6 +10,8 @@ Base path: `/api/`. Body and response format: JSON. Identifiers are 24 character
   `{"detail": "This record is outside your store access."}`
 - A role that may not perform the action returns 403 with:
   `{"detail": "Your role may not perform this action."}`
+- Deactivating or demoting the last active admin returns 403 with:
+  `{"detail": "The last active admin cannot be deactivated or demoted."}`
 - Validation errors return 400 with a field map, for example `{"email": ["An account with this email already exists."]}`.
 - Lists are paginated with `?page=` and `?page_size=` (default 20, maximum 100). List responses are `{"count": n, "next": url|null, "previous": url|null, "results": [...]}`.
 - No response ever contains a password.
