@@ -7,10 +7,10 @@ from .serializers import ProductSerializer
 
 
 class ProductList(generics.ListCreateAPIView):
-    queryset = Product.objects.all()
+    queryset = Product.objects.order_by("name")
     serializer_class = ProductSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_class = ProductFilter
+    filterset_class = ProductFilter
     name = "product-list"
 
 

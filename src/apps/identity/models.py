@@ -15,7 +15,7 @@ class User(AbstractUser):
 
     username = None
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=32, choices=Role.choices, default=Role.BARISTA)
+    role = models.CharField(max_length=32, choices=Role.choices)
     store_ids = ArrayField(ObjectIdField(), default=list)
 
     objects = UserManager()

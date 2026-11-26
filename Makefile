@@ -6,6 +6,10 @@ help:
 	@echo 'Usage:                                                        '
 	@echo '    make clean              Remove python compiled files      '
 	@echo '    make lint               Run ruff check and format check     '
+	@echo '    make run                Run the API on 0.0.0.0:8000             '
+	@echo '    make test               Run the whole test suite               '
+	@echo '    make migrate            Apply migrations to MongoDB           '
+	@echo '    make admin              Create the first admin, needs EMAIL and PASSWORD'
 # 	@echo '    make requirements       Install required packages         '
 # 	@echo '    make requirements_dev   Install required packages to Dev  '
 # 	@echo '    make unit               Run unit tests                    '
@@ -15,11 +19,23 @@ help:
 	@echo '                                                              '
 
 
-.PHONY: clean clean-pyc lint
+.PHONY: clean clean-pyc lint run test migrate admin
 
 lint:
 	uv run ruff check .
 	uv run ruff format --check .
+
+run:
+	uv run python src/manage.py runserver 0.0.0.0:8000
+
+test:
+	uv run pytest
+
+migrate:
+	uv run python src/manage.py migrate
+
+admin:
+	uv run python src/manage.py create_admin --email "$(EMAIL)" --password "$(PASSWORD)"
 
 clean-pyc:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

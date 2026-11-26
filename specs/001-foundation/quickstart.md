@@ -49,6 +49,7 @@ Use a cookie jar so the session survives between calls.
 ```bash
 BASE=http://127.0.0.1:8000/api
 JAR=/tmp/coffee-cookies.txt
+id_of() { python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])'; }
 ```
 
 ### 5.1 Sign in as admin and create two stores
@@ -60,23 +61,26 @@ curl -s -c "$JAR" -H 'Content-Type: application/json' \
 
 CSRF=$(awk '/csrftoken/ {print $7}' "$JAR")
 
-curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
+DOWNTOWN_ID=$(curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
   -d '{"name":"Downtown","address":"12 Main Street","postal_code":"12345"}' \
-  "$BASE/stores/"
+  "$BASE/stores/" | id_of)
+echo "Downtown: $DOWNTOWN_ID"
 
-curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
+RIVERSIDE_ID=$(curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
   -d '{"name":"Riverside","address":"9 River Road","postal_code":"12346"}' \
-  "$BASE/stores/"
+  "$BASE/stores/" | id_of)
+echo "Riverside: $RIVERSIDE_ID"
 ```
 
-Note the two store ids from the responses. They are needed below.
+The two ids are now in `$DOWNTOWN_ID` and `$RIVERSIDE_ID`.
 
 ### 5.2 Create a manager for Downtown only
 
 ```bash
-curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
-  -d '{"email":"manager@example.com","password":"change-this-now","role":"MANAGER","store_ids":["<DOWNTOWN_ID>"]}' \
-  "$BASE/accounts/"
+MANAGER_ID=$(curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
+  -d "{\"email\":\"manager@example.com\",\"password\":\"change-this-now\",\"role\":\"MANAGER\",\"first_name\":\"Marta\",\"last_name\":\"Costa\",\"store_ids\":[\"$DOWNTOWN_ID\"]}" \
+  "$BASE/accounts/" | id_of)
+echo "Manager: $MANAGER_ID"
 ```
 
 Expected: 201, and `store_ids` contains exactly Downtown.
@@ -97,7 +101,7 @@ curl -s -b "$MJAR" "$BASE/stores/"
 Expected: exactly one store, Downtown.
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' -b "$MJAR" "$BASE/stores/<RIVERSIDE_ID>/"
+curl -s -o /dev/null -w '%{http_code}\n' -b "$MJAR" "$BASE/stores/$RIVERSIDE_ID/"
 ```
 
 Expected: `403`. The body is `{"detail": "This record is outside your store access."}`.
@@ -107,7 +111,7 @@ Expected: `403`. The body is `{"detail": "This record is outside your store acce
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -b "$MJAR" -H "X-CSRFToken: $MCSRF" \
   -H 'Content-Type: application/json' \
-  -d '{"role":"ADMIN"}' "$BASE/accounts/<MANAGER_ID>/"
+  -d '{"role":"ADMIN"}' "$BASE/accounts/$MANAGER_ID/"
 ```
 
 Expected: `403`. The manager role is unchanged.
@@ -134,11 +138,36 @@ Sign in as the regional manager and list stores. Expected: all three, including 
 
 ```bash
 curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
-  -d '{"user_id":"<MANAGER_ID>","hire_date":"2026-11-01"}' \
+  -d "{\"user_id\":\"$MANAGER_ID\",\"hire_date\":\"2026-11-01\"}" \
   "$BASE/employees/"
 ```
 
-Expected: 201 with the profile. As the manager, `GET /api/employees/` shows it. As a barista in another store, it does not appear.
+Expected: 201 with the profile, including `user_name` from the manager's first and last name.
+
+As the manager, the list shows it:
+
+```bash
+curl -s -b "$MJAR" "$BASE/employees/"
+```
+
+Expected: `count` is 1.
+
+Create a barista in Riverside, then confirm the profile stays out of that barista's reach:
+
+```bash
+BARISTA_PAYLOAD=$(printf '{"email":"barista@example.com","password":"change-this-now","role":"BARISTA","store_ids":["%s"]}' "$RIVERSIDE_ID")
+curl -s -b "$JAR" -H "X-CSRFToken: $CSRF" -H 'Content-Type: application/json' \
+  -d "$BARISTA_PAYLOAD" "$BASE/accounts/"
+
+BJAR=/tmp/coffee-barista-cookies.txt
+curl -s -c "$BJAR" -H 'Content-Type: application/json' \
+  -d '{"email":"barista@example.com","password":"change-this-now"}' \
+  "$BASE/auth/login/"
+
+curl -s -b "$BJAR" "$BASE/employees/"
+```
+
+Expected: `count` is 0. The barista is in another store, so the profile is invisible, and a cross-store detail request answers 403.
 
 ## 6. Run the tests
 

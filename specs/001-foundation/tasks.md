@@ -91,17 +91,17 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Write `tests/test_accounts.py` covering: admin creates each of the five roles; duplicate email returns 400; manager creates a `BARISTA` in an own store; manager creating `ADMIN` returns 403; manager assigning a store outside their own returns 403; regional manager creates a `SUPERVISOR` in any store; manager listing accounts sees only own-store BARISTA and SUPERVISOR plus self; regional manager listing sees all; last active admin cannot be deactivated or demoted; deactivation takes effect on the next request; pagination caps at 100 and defaults to 20
-- [ ] T031 [US2] Run the T030 tests and confirm they fail before implementing
+- [X] T030 [P] [US2] Write `tests/test_accounts.py` covering: admin creates each of the five roles; duplicate email returns 400; manager creates a `BARISTA` in an own store; manager creating `ADMIN` returns 403; manager assigning a store outside their own returns 403; regional manager creates a `SUPERVISOR` in any store; manager listing accounts sees only own-store BARISTA and SUPERVISOR plus self; regional manager listing sees all; last active admin cannot be deactivated or demoted; deactivation takes effect on the next request; pagination caps at 100 and defaults to 20
+- [X] T031 [US2] Run the T030 tests and confirm they fail before implementing
 
 ### Implementation for User Story 2
 
-- [ ] T032 [US2] Add `AccountReadSerializer` and `AccountWriteSerializer` to `src/apps/identity/serializers.py`; `AccountWriteSerializer` validates `email` uniqueness case-insensitively, `role` in the five values, and every `store_ids` entry against an existing store, and never returns `password`
-- [ ] T033 [US2] Add actor-aware validation to `src/apps/identity/serializers.py`: a manager may only submit roles `BARISTA` and `SUPERVISOR` and only stores in the actor's `store_ids`; a regional manager may submit any store but only those two roles; only `ADMIN` may submit `ADMIN` or `REGIONAL_MANAGER`
-- [ ] T034 [US2] Implement `create_account(actor, data)` and `update_account(actor, user, data)` in `src/apps/identity/services.py`, including the last-active-admin guard from T016 and `assign_all_stores_to_regional_manager` when the new role is `REGIONAL_MANAGER`
-- [ ] T035 [US2] Implement `AccountListCreateView` and `AccountDetailView` in `src/apps/identity/views.py`: list filters `role`, `is_active`, and `store`; manager querysets are limited with `store_ids__overlap` plus the actor's own id; detail reads and updates go through `require_store_access`
-- [ ] T036 [US2] Add `accounts/` and `accounts/<id>/` routes to `src/apps/identity/urls.py`
-- [ ] T037 [US2] Run `uv run pytest tests/test_accounts.py tests/test_auth.py` and confirm both suites pass
+- [X] T032 [US2] Add `AccountReadSerializer` and `AccountWriteSerializer` to `src/apps/identity/serializers.py`; `AccountWriteSerializer` validates `email` uniqueness case-insensitively, `role` in the five values, and every `store_ids` entry against an existing store, and never returns `password`
+- [X] T033 [US2] Add actor-aware validation to `src/apps/identity/serializers.py`: a manager may only submit roles `BARISTA` and `SUPERVISOR` and only stores in the actor's `store_ids`; a regional manager may submit any store but only those two roles; only `ADMIN` may submit `ADMIN` or `REGIONAL_MANAGER`
+- [X] T034 [US2] Implement `create_account(actor, data)` and `update_account(actor, user, data)` in `src/apps/identity/services.py`, including the last-active-admin guard from T016 and `assign_all_stores_to_regional_manager` when the new role is `REGIONAL_MANAGER`
+- [X] T035 [US2] Implement `AccountListCreateView` and `AccountDetailView` in `src/apps/identity/views.py`: list filters `role`, `is_active`, and `store`; manager querysets are limited with `store_ids__overlap` plus the actor's own id; detail reads and updates go through `require_store_access`
+- [X] T036 [US2] Add `accounts/` and `accounts/<id>/` routes to `src/apps/identity/urls.py`
+- [X] T037 [US2] Run `uv run pytest tests/test_accounts.py tests/test_auth.py` and confirm both suites pass
 
 **Checkpoint**: US1 and US2 work. Account administration respects the matrix.
 
@@ -115,19 +115,19 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 ### Tests for User Story 3
 
-- [ ] T038 [P] [US3] Write `tests/test_store_scope.py` covering: manager sees exactly one store; admin sees all; cross-store `GET` returns 403 with `{"detail": "This record is outside your store access."}` and no store field; a user with empty `store_ids` gets an empty list and not an error; barista cannot create or change a store; manager cannot create a store; regional manager can create and rename a store; delete is admin only; catalog list stays global for every signed-in role
-- [ ] T039 [P] [US3] Write `tests/test_propagation.py` covering: creating a store appends its id to every regional manager; creating a regional manager assigns every existing store; deleting a store removes its id from every user; a regional manager created before any store exists sees the first store created afterwards
-- [ ] T040 [US3] Run the T038 and T039 tests and confirm they fail before implementing
+- [X] T038 [P] [US3] Write `tests/test_store_scope.py` covering: manager sees exactly one store; admin sees all; cross-store `GET` returns 403 with `{"detail": "This record is outside your store access."}` and no store field; a user with empty `store_ids` gets an empty list and not an error; barista cannot create or change a store; manager cannot create a store; regional manager can create and rename a store; delete is admin only; catalog list stays global for every signed-in role
+- [X] T039 [P] [US3] Write `tests/test_propagation.py` covering: creating a store appends its id to every regional manager; creating a regional manager assigns every existing store; deleting a store removes its id from every user; a regional manager created before any store exists sees the first store created afterwards
+- [X] T040 [US3] Run the T038 and T039 tests and confirm they fail before implementing
 
 ### Implementation for User Story 3
 
-- [ ] T041 [US3] Add `StoreSerializer` to `src/apps/stores/serializers.py` with `name` (max 40), `address` (max 100), and `postal_code` (max 10)
-- [ ] T042 [US3] Create `src/apps/stores/services.py`: `create_store(actor, data)` calls `identity.services.add_store_to_regional_managers(store_id)` and appends the store to the actor when the actor is a regional manager; `delete_store(actor, store)` calls `identity.services.remove_store_from_all_users(store_id)`; both use `django_mongodb_backend.transaction.atomic` when two collections change, and retry the whole operation on a `DatabaseError` write conflict, because MongoDB aborts one of two conflicting writes
-- [ ] T043 [US3] Rewrite `src/apps/stores/views.py`: list and detail querysets pass through `scope_stores`; create and change check `can(actor, "store.create" / "store.change")`; delete checks `can(actor, "store.delete")`; list is paginated and ordered by `name`
-- [ ] T044 [US3] Update `src/apps/stores/urls.py` to the `api/stores/` prefix expected by `src/core/urls.py`
-- [ ] T045 [US3] Update `src/apps/catalog/views.py`: require authentication, paginate the list, and do not apply any store filter; leave the model unchanged
-- [ ] T046 [US3] Replace any hand-written `store_ids__overlap` filter in `src/apps/identity/views.py` with `permissions.scope_stores`, so the account list has one scoping path, and confirm the manager overlap rule from T035 still holds
-- [ ] T047 [US3] Run `uv run pytest tests/test_store_scope.py tests/test_propagation.py tests/test_accounts.py` and confirm all pass
+- [X] T041 [US3] Add `StoreSerializer` to `src/apps/stores/serializers.py` with `name` (max 40), `address` (max 100), and `postal_code` (max 10)
+- [X] T042 [US3] Create `src/apps/stores/services.py`: `create_store(actor, data)` calls `identity.services.add_store_to_regional_managers(store_id)` and appends the store to the actor when the actor is a regional manager; `delete_store(actor, store)` calls `identity.services.remove_store_from_all_users(store_id)`; both use `django_mongodb_backend.transaction.atomic` when two collections change, and retry the whole operation on a `DatabaseError` write conflict, because MongoDB aborts one of two conflicting writes
+- [X] T043 [US3] Rewrite `src/apps/stores/views.py`: list and detail querysets pass through `scope_stores`; create and change check `can(actor, "store.create" / "store.change")`; delete checks `can(actor, "store.delete")`; list is paginated and ordered by `name`
+- [X] T044 [US3] Update `src/apps/stores/urls.py` to the `api/stores/` prefix expected by `src/core/urls.py`
+- [X] T045 [US3] Update `src/apps/catalog/views.py`: require authentication, paginate the list, and do not apply any store filter; leave the model unchanged
+- [X] T046 [US3] Replace any hand-written `store_ids__overlap` filter in `src/apps/identity/views.py` with `permissions.scope_stores`, so the account list has one scoping path, and confirm the manager overlap rule from T035 still holds
+- [X] T047 [US3] Run `uv run pytest tests/test_store_scope.py tests/test_propagation.py tests/test_accounts.py` and confirm all pass
 
 **Checkpoint**: Store scoping is proven on stores, accounts, and catalog.
 
@@ -141,16 +141,16 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 ### Tests for User Story 4
 
-- [ ] T048 [P] [US4] Write `tests/test_employees.py` covering: create a profile for an existing user; a second profile for the same user returns 400; a missing user returns 400; a profile outside the manager's stores returns 403; a barista list omits `user_email` and keeps `user_name`; `PATCH` changes `hire_date`; an account without a profile still signs in and works
-- [ ] T049 [US4] Run the T048 tests and confirm they fail before implementing
+- [X] T048 [P] [US4] Write `tests/test_employees.py` covering: create a profile for an existing user; a second profile for the same user returns 400; a missing user returns 400; a profile outside the manager's stores returns 403; a barista list omits `user_email` and keeps `user_name`; `PATCH` changes `hire_date`; an account without a profile still signs in and works
+- [X] T049 [US4] Run the T048 tests and confirm they fail before implementing
 
 ### Implementation for User Story 4
 
-- [ ] T050 [US4] Add `EmployeeSerializer` to `src/apps/identity/serializers.py` with `id`, `user_id`, `user_email`, `user_name`, and `hire_date`; drop `user_email` when the requesting role is `BARISTA`
-- [ ] T051 [US4] Add `create_employee(actor, data)` and `update_employee(actor, employee, data)` to `src/apps/identity/services.py`, validating that the user exists, has no profile yet, and is inside the actor's stores
-- [ ] T052 [US4] Implement `EmployeeListCreateView` and `EmployeeDetailView` in `src/apps/identity/views.py`, scoped through the linked user's `store_ids`, paginated, ordered by `hire_date` descending
-- [ ] T053 [US4] Add `employees/` and `employees/<id>/` routes to `src/apps/identity/urls.py`
-- [ ] T054 [US4] Run `uv run pytest tests/test_employees.py` and confirm every scenario passes
+- [X] T050 [US4] Add `EmployeeSerializer` to `src/apps/identity/serializers.py` with `id`, `user_id`, `user_email`, `user_name`, and `hire_date`; drop `user_email` when the requesting role is `BARISTA`
+- [X] T051 [US4] Add `create_employee(actor, data)` and `update_employee(actor, employee, data)` to `src/apps/identity/services.py`, validating that the user exists, has no profile yet, and is inside the actor's stores
+- [X] T052 [US4] Implement `EmployeeListCreateView` and `EmployeeDetailView` in `src/apps/identity/views.py`, scoped through the linked user's `store_ids`, paginated, ordered by `hire_date` descending
+- [X] T053 [US4] Add `employees/` and `employees/<id>/` routes to `src/apps/identity/urls.py`
+- [X] T054 [US4] Run `uv run pytest tests/test_employees.py` and confirm every scenario passes
 
 **Checkpoint**: All four user stories work independently and together.
 
@@ -160,14 +160,14 @@ Single Django project. The project root for Python is `src/`, and `manage.py` si
 
 **Purpose**: Finish the milestone with clean tooling and a proven quickstart.
 
-- [ ] T055 [P] Run `uv run ruff format src tests` and commit the formatting result
-- [ ] T056 [P] Run `uv run ruff check src tests --fix` and resolve every remaining finding
-- [ ] T057 Add type hints to public functions in `src/apps/identity/permissions.py`, `src/apps/identity/services.py`, `src/apps/stores/services.py`, and the model managers
-- [ ] T058 Run `uv run pytest` and confirm the full suite passes from a clean test database
-- [ ] T059 Walk `specs/001-foundation/quickstart.md` end to end on a fresh `docker compose down -v` then `up`, and fix any command that does not behave as written
-- [ ] T060 Search the repository for `psycopg`, `postgres`, `DATABASE_URL`, `employee_db`, and `Product` store filters, and confirm no stale Postgres reference remains
-- [ ] T061 Update the `Makefile` with `run`, `test`, `migrate`, and `admin` targets that wrap the `uv run python src/manage.py ...` commands
-- [ ] T062 Review `git status` and confirm only intended files changed; leave the commit to the Kyaor
+- [X] T055 [P] Run `uv run ruff format src tests` and commit the formatting result
+- [X] T056 [P] Run `uv run ruff check src tests --fix` and resolve every remaining finding
+- [X] T057 Add type hints to public functions in `src/apps/identity/permissions.py`, `src/apps/identity/services.py`, `src/apps/stores/services.py`, and the model managers
+- [X] T058 Run `uv run pytest` and confirm the full suite passes from a clean test database
+- [X] T059 Walk `specs/001-foundation/quickstart.md` end to end on a fresh `docker compose down -v` then `up`, and fix any command that does not behave as written
+- [X] T060 Search the repository for `psycopg`, `postgres`, `DATABASE_URL`, `employee_db`, and `Product` store filters, and confirm no stale Postgres reference remains
+- [X] T061 Update the `Makefile` with `run`, `test`, `migrate`, and `admin` targets that wrap the `uv run python src/manage.py ...` commands
+- [X] T062 Review `git status` and confirm only intended files changed; leave the commit to the Kyaor
 
 ---
 

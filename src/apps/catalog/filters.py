@@ -4,9 +4,11 @@ from .models import Product
 
 
 class ProductFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(name="name", lookup_expr="icontains")
-    description = django_filters.CharFilter(name="description", lookup_expr="icontains")
-    price = django_filters.CharFilter(name="price", lookup_expr="iexact")
+    name = django_filters.CharFilter(field_name="name", lookup_expr="icontains")
+    description = django_filters.CharFilter(
+        field_name="description", lookup_expr="icontains"
+    )
+    price = django_filters.CharFilter(field_name="price", lookup_expr="iexact")
 
     class Meta:
         model = Product
