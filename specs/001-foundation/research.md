@@ -90,11 +90,13 @@ Phase 0 decisions. Each entry states the decision, why it wins here, and what wa
 
 ## D10. Catalog stays unchanged in M0
 
-**Decision**: Keep `catalog.Product` as it is. It is global read data, never store filtered. The rename to `Item` and the price type fix belong to M2.
+**Decision**: Keep `catalog.Product` as it is. It is global read data, never store filtered. Only the price type fix belongs to M2.
 
 **Rationale**: M0 is about access, not catalog shape. The spec only requires catalog items to remain global. Changing the catalog model now adds migration churn with no M0 outcome.
 
-**Alternatives considered**: rename to `Item` now (extra work outside the milestone, and the inventory references do not exist yet).
+**Amended 2026-11-26**: The model name stays `Product`. The Kyaor settled the naming question, and `docs/MACRO.md` decision 6, the data shape, the glossary, and constitution invariant I3 were amended to say `Product` rather than `Item`. Only the price type fix is still carried into M2, where `Product.price` is a free text field today.
+
+**Alternatives considered**: rename to `Item` (rejected on 2026-11-26: the docs follow the code, not the other way round) and rename now, in M0 (extra work outside the milestone, and the inventory references do not exist yet).
 
 ## D11. Tests run against a real MongoDB
 

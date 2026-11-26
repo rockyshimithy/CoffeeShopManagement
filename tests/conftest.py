@@ -11,7 +11,9 @@ from datetime import UTC, datetime
 import pytest
 from rest_framework.test import APIClient
 
+from apps.catalog.models import Product
 from apps.identity.models import Employee, User
+from apps.inventory.models import Pool, Stock
 from apps.stores.models import Store
 from apps.workforce.models import Shift
 
@@ -70,6 +72,41 @@ def make_shift(db, make_employee, make_store):
             store=store or make_store(),
             starts_at=starts_at,
             ends_at=ends_at,
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_product(db):
+    def _make(
+        name=None, unit="pcs", price=None, threshold=None, description="", **extra
+    ):
+        return Product.objects.create(
+            name=name or f"Product {next(_names)}",
+            description=description,
+            unit=unit,
+            price=price,
+            low_stock_threshold=threshold,
+            **extra,
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_stock(db, make_product, make_store):
+    def _make(
+        product=None, pool_type=Pool.BRANCH, store=None, current_stock=0, **extra
+    ):
+        if pool_type == Pool.BRANCH and store is None:
+            store = make_store()
+        return Stock.objects.create(
+            product=product or make_product(),
+            pool_type=pool_type,
+            store=store,
+            current_stock=current_stock,
+            **extra,
         )
 
     return _make

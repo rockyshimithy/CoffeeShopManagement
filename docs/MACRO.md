@@ -1,6 +1,6 @@
 # CoffeeShopManagement: Macro Concept
 
-Version: 0.6 | Created: 2026-11-20 | Updated: 2026-11-26 | Owner: Kyaor
+Version: 0.8 | Created: 2026-11-20 | Updated: 2026-11-26 | Owner: Kyaor
 
 This document is the project wide view. It is deliberately not a feature spec. Feature
 specs live in `specs/NNN-slug/` and follow the chain required by
@@ -35,7 +35,7 @@ imports between contexts, so each one exposes service functions and its own API 
 | `identity` | proposed | `User` and `Employee`, authentication, role matrix, permission helpers |
 | `stores` | exists as stub | `Store`: name, address, postal code |
 | `workforce` | exists as stub | `Shift`: who works where and when |
-| `catalog` | exists as stub | `Item`: name, description, price, sellable, unit |
+| `catalog` | exists as stub | `Product`: name, description, price, sellable, unit |
 | `inventory` | proposed | `Stock` and `StockEvent`: how much of an item sits in one pool, and every change |
 | `commerce` | proposed | `Order` with embedded `OrderItem`. Fake checkout, no payment provider |
 
@@ -48,18 +48,18 @@ person.
 Collections, not tables. Every document carries an ObjectId `_id`.
 
 ```
-Item        name, description, price (nullable), sellable, unit
+Product     name, description, price (nullable), sellable, unit
 Store       name, address, postal_code
 Shift       employee_id, store_id, starts_at, ends_at
 Order       reference, status, placed_at, total, items[]  (OrderItem embedded)
-OrderItem   item_id, quantity, unit_price (snapshot)
+OrderItem   product_id, quantity, unit_price (snapshot)
 
 User        email, password_hash, role, is_active, store_ids[]
 Employee    user_id, hire_date
 
-Stock       item_id, pool_type (BRANCH | ONLINE), store_id (null when ONLINE),
-            current_stock, last_count, last_event_at
-StockEvent  stock_id, item_id, pool_type, store_id,
+Stock       product_id, pool_type (BRANCH | ONLINE), store_id (null when ONLINE),
+            current_stock, last_count, last_count_at, last_event_at
+StockEvent  stock_id, product_id, pool_type, store_id,
             kind (MOVEMENT | COUNT),
             type (RECEIVED | SOLD | WASTE, null when kind is COUNT),
             quantity (null when kind is COUNT),
@@ -72,7 +72,7 @@ one source of truth decides who sees what.
 
 `unit` is a display label only (`pcs`, `L`, `kg`). No conversion logic ever goes in.
 
-| Item | `sellable` | Price | Stocked at a store |
+| Product | `sellable` | Price | Stocked at a store |
 |---|---|---|---|
 | Coffee bag XYZ | yes | 12.50 | yes, sold at the counter and ground for drinks |
 | Milk | no | none | yes, in litres |
@@ -103,7 +103,7 @@ unexplained loss, and it falls out of the two without inventing a `SHRINKAGE` ty
 | 3 | Custom `User` model with a `role` field, used for login and authorization. | 2026-11-20 | Every rule in every surface depends on it. Django makes this migration painful later, and there is no data to migrate now. |
 | 4 | `Store` is the scoping unit. Queries filter by the actor's store assignments, which are many. | 2026-11-23 | One person can work at several stores, so a single field cannot express access. |
 | 5 | Roles: `ADMIN`, `REGIONAL_MANAGER`, `MANAGER`, `SUPERVISOR`, `BARISTA`. Authorization is a role field plus one permission helper module. No Django groups. | 2026-11-24 | Store scoping forces object level checks anyway, so groups would add a second source of truth and remove no work. Matches the Ponytail principle. |
-| 6 | One shared `Item` for identity, description, and price. Stock is separate and lives in pools. Pools never affect each other. | 2026-11-20 | A sale online changes only the online pool. The isolation becomes structural rather than a rule to remember. |
+| 6 | One shared `Product` for identity, description, and price. Stock is separate and lives in pools. Pools never affect each other. | 2026-11-20, amended 2026-11-26 | A sale online changes only the online pool. The isolation becomes structural rather than a rule to remember. |
 | 7 | Fake checkout creates a real `Order` document with embedded `OrderItem` records. | 2026-11-23 | An order line has no life outside its order, so embedding costs nothing. |
 | 8 | Delivery order: workforce, inventory, inventory insight, storefront, 3D, polish. | 2026-11-23 | Domain complexity first, presentation last, and the 3D scene cannot break the backend. |
 | 9 | Spec-kit is the only spec workflow that produces files. Leanspec is allowed as a thinking format only, with no artifact output. | 2026-11-20 | The constitution names `.specify/` as the home of the approved chain. Two systems writing artifacts means two sources of truth. |
@@ -111,11 +111,11 @@ unexplained loss, and it falls out of the two without inventing a `SHRINKAGE` ty
 | 11 | Price lives on the item and is identical online and in store. | 2026-11-20 | One price per item, no price lists per channel. |
 | 12 | No stock transfers between pools, ever. | 2026-11-20 | Isolation is the model, not a feature to add later. |
 | 13 | `inventory` is its own context. | 2026-11-20 | Both `catalog` and `commerce` read stock, so a separate app avoids a cycle. |
-| 14 | `Item.unit` is a display label only. No unit conversion logic. | 2026-11-20 | A stock list that says `2.5 L` is readable. A conversion engine is not needed. |
-| 15 | No point of sale in scope. Store stock moves only through recorded movements and counts. Sales exist only in the storefront and change only the online pool. | 2026-11-23 | Removes a whole subsystem and makes pool isolation consistent. |
+| 14 | `Product.unit` is a display label only. No unit conversion logic. | 2026-11-20 | A stock list that says `2.5 L` is readable. A conversion engine is not needed. |
+| 15 | No point of sale in scope. Store stock moves only through recorded movements and counts. Sales exist only in the storefront and change only the online pool. | 2026-11-23, amended 2026-11-26 | Removes a whole subsystem and makes pool isolation consistent. Amended: the online only sale rule is a milestone policy, not a structural one. A branch pool may accept sold movements once a point of sale exists. |
 | 16 | No recipe based depletion. Selling a drink does not subtract milk. | 2026-11-20 | Nothing in scope sells a drink, so the rule would be dead code. |
 | 17 | MongoDB through `django-mongodb-backend`, with `ObjectIdAutoField` on every model. | 2026-11-23 | Documents fit stock history, and the backend keeps Django auth, admin, and the ORM. |
-| 18 | `Stock` holds `current_stock` and `last_count`. `StockEvent` holds every movement and count in its own collection. | 2026-11-23 | M3 needs events across items, which embedded arrays cannot serve without scanning every document. |
+| 18 | `Stock` holds `current_stock` and `last_count`. `StockEvent` holds every movement and count in its own collection. | 2026-11-23, amended 2026-11-26 | M3 needs events across items, which embedded arrays cannot serve without scanning every document. Amended: `Stock` also holds `last_count_at`, because refusing a movement that predates the newest count needs that instant, and deriving it would cost an extra indexed read on the hottest write path. |
 | 19 | Stock changes only through one service function, inside a transaction, never by loading a value, editing it in Python, and saving it. | 2026-11-23 | The number and the events are two writes, so that function is the only thing keeping them in agreement. |
 | 20 | Related data on list endpoints loads by manual batch after pagination. Index on `(store_id, starts_at)`. The schedule is cached. An endpoint that must order by a related field may join instead, because a page cannot be re-sorted after pagination. | 2026-11-23, amended 2026-11-26 | `prefetch_related()` is unsupported on this backend, so the per row query has to be prevented by hand. A sort on a joined field cannot use an index, so it is only allowed where the window and the store assignments bound the working set. |
 | 21 | Transactions use `django_mongodb_backend.transaction.atomic`, never `django.db.transaction`. | 2026-11-23 | Django's transaction API is a documented no-op here, so the idiomatic import fails silently. |
@@ -136,9 +136,9 @@ These four are promoted to `.specify/memory/constitution.md` as of 2026-11-23, u
    actor's store assignments. `ADMIN` is the only bypass.
 2. Pool isolation: one operation changes stock in at most one pool, and no transfer
    operation exists.
-3. One item identity: an item exists once in the catalog, and stock references that
-   document. Stock never copies the item's name or price. Order lines do copy the price,
-   because an order records the past.
+3. One product identity: a product exists once in the catalog, and stock references
+   that document. Stock never copies the product's name or price. Order lines do copy the
+   price, because an order records the past.
 4. Stock is never read, edited in Python, and saved. Every change goes through the single
    write function, inside a transaction.
 
@@ -168,11 +168,12 @@ across items, embedded arrays would have been the simpler choice.
 | 2 | Does the storefront sell prepared drinks, or only packaged goods? | A drink would pull recipe based depletion back into scope. |
 | 3 | What does "portfolio ready" require beyond working code? | Live deployment, screenshots, and a written story all cost time that could go into features. |
 | 4 | What deployment shape? One host, or a backend plus static frontends? | Deferred, but it decides whether M6 is a compose file or a cloud setup. |
+| 5 | When does a branch pool begin accepting sold movements, and what reference does a branch sale carry? | Decision 15 keeps a sale online only for now. Until a point of sale exists, counter shrinkage is visible only as a count discrepancy. |
 
 ## 8. Glossary
 
 - **Store**: one physical coffee shop. The `stores` model.
-- **Item**: one thing that can be stocked or sold. The `catalog` model.
+- **Product**: one thing that can be stocked or sold. The `catalog` model. Called an item in prose.
 - **Supply**: an item that is stocked but never sold. Not a separate model, just an item with `sellable = False`.
 - **Pool**: a place that holds stock. Either one store, or the single online pool.
 - **Movement**: a relative stock change. `RECEIVED`, `SOLD`, or `WASTE`.

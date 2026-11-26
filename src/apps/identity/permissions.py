@@ -25,6 +25,9 @@ ACTIONS = frozenset(
         "shift.create",
         "shift.change",
         "shift.delete",
+        "product.change",
+        "stock.read",
+        "stock.record",
     }
 )
 
@@ -92,6 +95,23 @@ ROLE_ACTIONS = {
         User.Role.SUPERVISOR,
     },
     "shift.delete": {
+        User.Role.ADMIN,
+        User.Role.REGIONAL_MANAGER,
+        User.Role.MANAGER,
+        User.Role.SUPERVISOR,
+    },
+    "product.change": {
+        User.Role.ADMIN,
+        User.Role.REGIONAL_MANAGER,
+    },
+    "stock.read": {
+        User.Role.ADMIN,
+        User.Role.REGIONAL_MANAGER,
+        User.Role.MANAGER,
+        User.Role.SUPERVISOR,
+        User.Role.BARISTA,
+    },
+    "stock.record": {
         User.Role.ADMIN,
         User.Role.REGIONAL_MANAGER,
         User.Role.MANAGER,
@@ -166,6 +186,34 @@ def require_action(actor: User, action: str, store_id: ObjectId | None = None) -
         raise PermissionDenied(ROLE_DENIED)
     if store_id is not None:
         require_store_access(actor, store_id)
+
+
+def reaches_every_store(actor: User) -> bool:
+    """Does this actor's scope cover every store that exists?
+
+    The online pool belongs to no store, so it is reachable only by an actor
+    whose assignments already cover everything: ADMIN, and in practice a
+    regional manager, because creating a store adds it to their assignments.
+    Asking the question this way keeps the answer inside the helper, so no other
+    module compares a role to decide what a query may see (SC-006).
+    """
+    if actor.role == User.Role.ADMIN:
+        return True
+    from apps.stores.services import all_store_ids
+
+    return set(actor.store_ids) == set(all_store_ids())
+
+
+def require_stock_access(actor: User, store_id: ObjectId | None) -> None:
+    """Store access for a stock write or read, with the online pool as a case.
+
+    ``store_id`` is the store of a branch pool, or ``None`` for the online pool.
+    """
+    if store_id is None:
+        if not reaches_every_store(actor):
+            raise PermissionDenied(STORE_DENIED)
+        return
+    require_store_access(actor, store_id)
 
 
 ACCOUNT_MANAGED_ROLES = frozenset({User.Role.BARISTA, User.Role.SUPERVISOR})

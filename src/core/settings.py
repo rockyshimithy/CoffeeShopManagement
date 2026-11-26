@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.workforce",
     "apps.stores",
     "apps.catalog",
+    "apps.inventory",
 ]
 
 DEFAULT_AUTO_FIELD = "django_mongodb_backend.fields.ObjectIdAutoField"

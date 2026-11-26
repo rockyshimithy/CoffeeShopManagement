@@ -7,7 +7,7 @@ app_name = "catalog"
 urlpatterns = [
     path("products/", views.ProductList.as_view(), name=views.ProductList.name),
     path(
-        "products/<int:pk>/",
+        "products/<str:pk>/",
         views.ProductDetail.as_view(),
         name=views.ProductDetail.name,
     ),

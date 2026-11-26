@@ -20,6 +20,19 @@ def all_store_ids() -> QuerySet:
     return Store.objects.values_list("pk", flat=True)
 
 
+def store_names(store_ids) -> dict:
+    """Public read: ``{store_id_hex: name}`` for one page of rows.
+
+    One query for the whole batch, which is what replaces ``prefetch_related()``
+    on this backend.
+    """
+    ids = [store_id for store_id in store_ids if store_id is not None]
+    if not ids:
+        return {}
+    rows = Store.objects.filter(pk__in=ids).values_list("pk", "name")
+    return {str(pk): name for pk, name in rows}
+
+
 def store_exists(store_id: ObjectId) -> bool:
     """Public read for other contexts: does this store exist?"""
     return Store.objects.filter(pk=store_id).exists()

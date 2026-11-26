@@ -1,9 +1,13 @@
 # CoffeeShopManagement Constitution
 
 <!-- Sync Impact Report:
-Version change: 0.1.0 → 0.1.1
-Modified principles:
-  - 1. Modular Monolith Architecture (module path corrected to src/apps/)
+Version change: 0.1.1 → 0.1.2
+Modified principles: none
+Modified invariants:
+  - I3. One Item Identity renamed to One Product Identity, so the invariant matches the
+    model name `Product` in src/apps/catalog. The rule itself is unchanged.
+Other changes:
+  - Data Layer, Query rules: the stock event index on (item_id, at) becomes (product_id, at).
 Added sections: none
 Removed sections: none
 Templates requiring updates: none
@@ -49,9 +53,9 @@ the tests pass.
 - A single operation changes stock in at most one pool. A pool is one store, or the single online pool.
 - No stock transfer operation exists. No code path writes stock for two pools in one operation.
 
-### I3. One Item Identity
-- An item exists once in the catalog. Stock references that document by id.
-- Stock never copies an item's name or price.
+### I3. One Product Identity
+- A product exists once in the catalog. Stock references that document by id.
+- Stock never copies a product's name or price.
 - Order lines do copy `unit_price`, because an order records what was charged at that moment.
 
 ### I4. Stock Is Never Read Then Saved
@@ -74,7 +78,7 @@ the tests pass.
 ### Query rules
 - No list endpoint returns an unbounded result set. Pagination is mandatory.
 - Shifts are indexed on `(store_id, starts_at)`.
-- Stock events are indexed on `(store_id, at)`, `(item_id, at)`, and `(stock_id, at)`.
+- Stock events are indexed on `(store_id, at)`, `(product_id, at)`, and `(stock_id, at)`.
 - The schedule endpoint is cached. A read that repeats for every user in a store does not need to reach the database.
 
 ## Development Constraints
@@ -88,4 +92,4 @@ the tests pass.
 - **Versioning Policy:** The Constitution version adheres to semantic versioning: MAJOR for backward-incompatible changes, MINOR for additions or significant expansions, and PATCH for clarifications or minor refinements.
 - **Compliance Review:** All code contributions and architectural decisions MUST be reviewed for compliance with these principles before integration.
 
-**Version**: 0.1.1 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-11-24
+**Version**: 0.1.2 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-11-26
