@@ -1,6 +1,6 @@
 # CoffeeShopManagement: Macro Concept
 
-Version: 0.8 | Created: 2026-11-20 | Updated: 2026-11-26 | Owner: Kyaor
+Version: 0.9 | Created: 2026-11-20 | Updated: 2026-11-26 | Owner: Kyaor
 
 This document is the project wide view. It is deliberately not a feature spec. Feature
 specs live in `specs/NNN-slug/` and follow the chain required by
@@ -32,11 +32,11 @@ imports between contexts, so each one exposes service functions and its own API 
 
 | Context | Status | Owns |
 |---|---|---|
-| `identity` | proposed | `User` and `Employee`, authentication, role matrix, permission helpers |
-| `stores` | exists as stub | `Store`: name, address, postal code |
-| `workforce` | exists as stub | `Shift`: who works where and when |
-| `catalog` | exists as stub | `Product`: name, description, price, sellable, unit |
-| `inventory` | proposed | `Stock` and `StockEvent`: how much of an item sits in one pool, and every change |
+| `identity` | exists | `User` and `Employee`, authentication, role matrix, permission helpers |
+| `stores` | exists | `Store`: name, address, postal code |
+| `workforce` | exists | `Shift`: who works where and when |
+| `catalog` | exists | `Product`: name, description, price, unit, `low_stock_threshold`. `sellable` arrives in M4 |
+| `inventory` | exists | `Stock` and `StockEvent`: how much of an item sits in one pool, and every change |
 | `commerce` | proposed | `Order` with embedded `OrderItem`. Fake checkout, no payment provider |
 
 `identity` owns both `User` and `Employee` because they describe the same person and are
