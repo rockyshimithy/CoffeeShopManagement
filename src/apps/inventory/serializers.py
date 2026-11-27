@@ -91,6 +91,70 @@ class StockEventSerializer(serializers.ModelSerializer):
         )
 
 
+class EventReadSerializer(StockEventSerializer):
+    """One recorded change with the names the report and the feed show."""
+
+    product_name = serializers.SerializerMethodField()
+    unit = serializers.SerializerMethodField()
+    store_name = serializers.SerializerMethodField()
+
+    class Meta(StockEventSerializer.Meta):
+        fields = StockEventSerializer.Meta.fields + (
+            "product_name",
+            "unit",
+            "store_name",
+        )
+
+    def _label(self, row) -> tuple:
+        return self.context.get("labels", {}).get(str(row.product_id), ("", ""))
+
+    def get_product_name(self, row) -> str:
+        return self._label(row)[0]
+
+    def get_unit(self, row) -> str:
+        return self._label(row)[1]
+
+    def get_store_name(self, row):
+        if row.store_id is None:
+            return None
+        return self.context.get("store_names", {}).get(str(row.store_id))
+
+
+class WasteTotalSerializer(serializers.Serializer):
+    """One item's waste in the window, with its exact total."""
+
+    product_id = ObjectIdField(read_only=True)
+    product_name = serializers.SerializerMethodField()
+    unit = serializers.SerializerMethodField()
+    total = QuantityField(read_only=True)
+    events = serializers.IntegerField(read_only=True)
+
+    def _label(self, row) -> tuple:
+        return self.context.get("labels", {}).get(str(row["product_id"]), ("", ""))
+
+    def get_product_name(self, row) -> str:
+        return self._label(row)[0]
+
+    def get_unit(self, row) -> str:
+        return self._label(row)[1]
+
+
+class WasteReportQuerySerializer(serializers.Serializer):
+    """The window the waste report reads, and the two optional narrowings."""
+
+    start = serializers.DateTimeField()
+    end = serializers.DateTimeField()
+    store = ObjectIdField(required=False)
+    product = ObjectIdField(required=False)
+
+    def validate(self, data):
+        if data["start"] > data["end"]:
+            raise serializers.ValidationError(
+                {"end": ["The end must not be earlier than the start."]}
+            )
+        return data
+
+
 class MovementWriteSerializer(serializers.Serializer):
     """The create shape for a delivery, a sale, or waste.
 

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from bson import ObjectId
 from bson.errors import InvalidId
 from rest_framework import generics, status
@@ -8,15 +10,25 @@ from rest_framework.views import APIView
 
 from apps.identity.permissions import (
     STORE_DENIED,
+    require_action,
     require_stock_access,
 )
+from core.fields import QuantityField
 from core.pagination import StandardPagination
 from core.shortcuts import object_id_or_404
 
-from .models import Pool, Stock
-from .serializers import StockEventSerializer, StockSerializer
+from .models import EventKind, Movement, Pool, Stock
+from .serializers import (
+    EventReadSerializer,
+    StockEventSerializer,
+    StockSerializer,
+    WasteReportQuerySerializer,
+    WasteTotalSerializer,
+)
 from .services import (
     enrich,
+    enrich_events,
+    event_scope,
     list_events,
     low_stock,
     pool_is_visible,
@@ -24,6 +36,7 @@ from .services import (
     record_movement,
     stock_after,
     stock_scope,
+    waste_totals,
 )
 
 
@@ -80,6 +93,7 @@ class StockList(generics.ListAPIView):
     def get_queryset(self):
         params = self.request.query_params
         store_id = _object_id(params["store"]) if params.get("store") else None
+        require_action(self.request.user, "stock.read")
         queryset = stock_scope(Stock.objects.all(), self.request.user, store_id)
 
         pool = params.get("pool")
@@ -112,6 +126,7 @@ class StockLow(APIView):
     def get(self, request):
         params = request.query_params
         store_id = _object_id(params["store"]) if params.get("store") else None
+        require_action(request.user, "stock.read")
         page, page_size = _page_args(request)
         total, rows = low_stock(request.user, store_id, page, page_size)
         data = StockSerializer(rows, many=True, context=enrich(rows)).data
@@ -125,12 +140,71 @@ class StockEventList(APIView):
 
     def get(self, request, pk):
         stock = object_id_or_404(Stock, pk)
+        require_action(request.user, "stock.read")
         require_stock_access(request.user, stock.store_id)
         page, page_size = _page_args(request)
         total, rows = list_events(stock.pk, page, page_size)
         return _paged_response(
             request, total, page, page_size, StockEventSerializer(rows, many=True).data
         )
+
+
+class WasteReport(APIView):
+    """Every waste event in an inclusive range, with per item totals."""
+
+    name = "waste-report"
+
+    def get(self, request):
+        query = WasteReportQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        bounds = query.validated_data
+        page, page_size = _page_args(request)
+        require_action(request.user, "stock.read")
+        queryset = event_scope(
+            request.user, bounds.get("store"), bounds.get("product")
+        ).filter(
+            kind=EventKind.MOVEMENT,
+            type=Movement.WASTE,
+            at__gte=bounds["start"],
+            at__lte=bounds["end"],
+        )
+        totals = waste_totals(queryset)
+        count = sum(row["events"] for row in totals)
+        offset = (page - 1) * page_size
+        rows = list(queryset[offset : offset + page_size])
+        context = enrich_events(rows, [row["product_id"] for row in totals])
+        grand_total = sum((row["total"] for row in totals), Decimal(0))
+        response = _paged_response(
+            request,
+            count,
+            page,
+            page_size,
+            EventReadSerializer(rows, many=True, context=context).data,
+        )
+        response.data["totals"] = WasteTotalSerializer(
+            totals, many=True, context=context
+        ).data
+        response.data["grand_total"] = QuantityField().to_representation(grand_total)
+        return response
+
+
+class ActivityFeed(generics.ListAPIView):
+    """Every stock change in the actor's scope as one timeline, newest first."""
+
+    serializer_class = EventReadSerializer
+    name = "activity-feed"
+
+    def get_queryset(self):
+        params = self.request.query_params
+        store_id = _object_id(params["store"]) if params.get("store") else None
+        product_id = _object_id(params["product"]) if params.get("product") else None
+        require_action(self.request.user, "stock.read")
+        return event_scope(self.request.user, store_id, product_id)
+
+    def list(self, request, *args, **kwargs):
+        rows = self.paginate_queryset(self.get_queryset())
+        data = EventReadSerializer(rows, many=True, context=enrich_events(rows)).data
+        return self.get_paginated_response(data)
 
 
 class MovementList(APIView):

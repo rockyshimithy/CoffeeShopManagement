@@ -13,6 +13,12 @@ urlpatterns = [
         name=views.MovementList.name,
     ),
     path("stock/counts/", views.CountList.as_view(), name=views.CountList.name),
+    path("stock/waste/", views.WasteReport.as_view(), name=views.WasteReport.name),
+    path(
+        "stock/activity/",
+        views.ActivityFeed.as_view(),
+        name=views.ActivityFeed.name,
+    ),
     path(
         "stock/<str:pk>/events/",
         views.StockEventList.as_view(),

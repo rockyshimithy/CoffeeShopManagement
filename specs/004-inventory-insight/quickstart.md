@@ -50,7 +50,7 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Expected: the M0, M1, and M2 suites still pass, plus roughly 30 new tests in
+Expected: the M0, M1, and M2 suites still pass, plus 57 new tests in
 `test_waste_report.py`, `test_activity_feed.py`, and `test_insight_scope.py`. No lint findings.
 
 The report timing test seeds 10,000 events, times one request, and prints the elapsed time.
@@ -130,27 +130,32 @@ curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/jso
   -d "{\"product\":\"$MILK\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"type\":\"RECEIVED\",\"quantity\":\"12.5\",\"at\":\"2026-11-24T08:00:00Z\"}" \
   "$BASE/stock/movements/" >/dev/null
 
-# 2. two litres of milk binned
+# 2. a delivery of coffee bags, so the coffee waste has stock to remove
+curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/json' \
+  -d "{\"product\":\"$COFFEE\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"type\":\"RECEIVED\",\"quantity\":\"6\",\"at\":\"2026-11-24T07:30:00Z\"}" \
+  "$BASE/stock/movements/" >/dev/null
+
+# 3. two litres of milk binned
 curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/json' \
   -d "{\"product\":\"$MILK\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"type\":\"WASTE\",\"quantity\":\"2\",\"note\":\"expired on Tuesday\",\"at\":\"2026-11-24T09:00:00Z\"}" \
   "$BASE/stock/movements/" >/dev/null
 
-# 3. one coffee bag binned
+# 4. one coffee bag binned
 curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/json' \
   -d "{\"product\":\"$COFFEE\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"type\":\"WASTE\",\"quantity\":\"1\",\"note\":\"dropped the bag\",\"at\":\"2026-11-24T09:30:00Z\"}" \
   "$BASE/stock/movements/" >/dev/null
 
-# 4. a quarter litre of milk spilled
+# 5. a quarter litre of milk spilled
 curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/json' \
   -d "{\"product\":\"$MILK\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"type\":\"WASTE\",\"quantity\":\"0.25\",\"note\":\"spilled\",\"at\":\"2026-11-24T10:00:00Z\"}" \
   "$BASE/stock/movements/" >/dev/null
 
-# 5. a count, which is not waste and must not appear in the report
+# 6. a count, which is not waste and must not appear in the report
 curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/json' \
   -d "{\"product\":\"$MILK\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"counted\":\"9\",\"note\":\"counted the shelf\",\"at\":\"2026-11-24T12:00:00Z\"}" \
   "$BASE/stock/counts/" >/dev/null
 
-# 6. three litres of milk binned the next day
+# 7. three litres of milk binned the next day
 curl -s -b "$MANAGER_JAR" -H "X-CSRFToken: $M" -H 'Content-Type: application/json' \
   -d "{\"product\":\"$MILK\",\"pool\":\"BRANCH\",\"store\":\"$STORE_A\",\"type\":\"WASTE\",\"quantity\":\"3\",\"note\":\"expired again\",\"at\":\"2026-11-25T11:00:00Z\"}" \
   "$BASE/stock/movements/" >/dev/null
@@ -168,9 +173,9 @@ curl -s -b "$ADMIN_JAR" -H "X-CSRFToken: $A" -H 'Content-Type: application/json'
   "$BASE/stock/movements/" >/dev/null
 ```
 
-Expected: eight events in total. Six in store A: delivery 08:00, waste 09:00, waste 09:30,
-waste 10:00, count 12:00, waste next day 11:00. Two in the online pool: delivery 13:00 and sale
-14:00.
+Expected: nine events in total. Seven in store A: coffee delivery 07:30, milk delivery 08:00,
+waste 09:00, waste 09:30, waste 10:00, count 12:00, waste next day 11:00. Two in the online
+pool: delivery 13:00 and sale 14:00.
 
 ## 9. Read the waste report for day one
 
@@ -301,19 +306,20 @@ M=$(csrf "$MANAGER_JAR")
 curl -s -b "$MANAGER_JAR" "$BASE/stock/activity/?page_size=2" | python3 -m json.tool
 ```
 
-Expected: `count` 6, and two rows. The newest is the 2026-11-25 waste of 3, then the count at
+Expected: `count` 7, and two rows. The newest is the 2026-11-25 waste of 3, then the count at
 12:00 on day one. Both are in store A.
 
 Page through it:
 
 ```bash
-for P in 1 2 3; do
+for P in 1 2 3 4; do
   curl -s -b "$MANAGER_JAR" "$BASE/stock/activity/?page_size=2&page=$P" \
     | python3 -c 'import json,sys; d=json.load(sys.stdin); print([(r["at"], r["kind"], r["type"]) for r in d["results"]])'
 done
 ```
 
-Expected: three pages of two, six distinct entries across them, ordered by instant descending.
+Expected: four pages, three of two and a last of one, seven distinct entries across them,
+ordered by instant descending.
 The kinds are mixed: `MOVEMENT` with `RECEIVED`, `WASTE`, and one `COUNT`. There is no `SOLD`,
 because the sale is in the online pool, which the manager cannot see.
 
@@ -333,7 +339,7 @@ curl -s -b "$REGIONAL_JAR" "$BASE/stock/activity/?page_size=100" \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print("count",d["count"]); [print(r["pool"], r["store_id"], r["store_name"], r["type"] or r["kind"]) for r in d["results"]]'
 ```
 
-Expected: `count` 8, and two rows with `pool` `ONLINE`, `store_id` null, and `store_name` null:
+Expected: `count` 9, and two rows with `pool` `ONLINE`, `store_id` null, and `store_name` null:
 the sale at 14:00 and the delivery at 13:00. The manager's read above never showed them.
 
 Naming a store excludes the online pool even for the regional manager:
@@ -343,7 +349,7 @@ curl -s -b "$REGIONAL_JAR" "$BASE/stock/activity/?store=$STORE_A&page_size=100" 
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["count"], {r["pool"] for r in d["results"]})'
 ```
 
-Expected: `6` and only `{'BRANCH'}`.
+Expected: `7` and only `{'BRANCH'}`.
 
 ## 16. Prove every reading role is allowed
 

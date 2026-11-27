@@ -6,14 +6,16 @@ connection: the tests talk to the same MongoDB the app uses.
 """
 
 import itertools
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pytest
+from bson import ObjectId
 from rest_framework.test import APIClient
 
 from apps.catalog.models import Product
 from apps.identity.models import Employee, User
-from apps.inventory.models import Pool, Stock
+from apps.inventory.models import EventKind, Movement, Pool, Stock, StockEvent
 from apps.stores.models import Store
 from apps.workforce.models import Shift
 
@@ -21,6 +23,8 @@ PASSWORD = "test-password-123"
 
 SHIFT_START = datetime(2026, 11, 30, 8, 0, tzinfo=UTC)
 SHIFT_END = datetime(2026, 11, 30, 16, 0, tzinfo=UTC)
+
+EVENT_START = datetime(2026, 11, 24, 8, 0, tzinfo=UTC)
 
 _emails = itertools.count(1)
 _names = itertools.count(1)
@@ -126,3 +130,44 @@ def as_user(api_client):
         return api_client
 
     return _login
+
+
+def _event_values(stock, at, fields):
+    """Defaults for one event. The write path is bypassed, so no validator runs."""
+    values = {
+        "stock": stock,
+        "product_id": stock.product_id,
+        "pool_type": stock.pool_type,
+        "store_id": stock.store_id,
+        "kind": EventKind.MOVEMENT,
+        "type": Movement.RECEIVED,
+        "quantity": Decimal(1),
+        "by_id": ObjectId(),
+        "by_name": "Test Actor",
+        "at": at,
+    }
+    values.update(fields)
+    if values["type"] == Movement.WASTE and not values.get("note"):
+        values["note"] = "Spilled"
+    return values
+
+
+@pytest.fixture
+def make_event(db):
+    def _make(stock, **fields):
+        return StockEvent.objects.create(**_event_values(stock, EVENT_START, fields))
+
+    return _make
+
+
+@pytest.fixture
+def make_events(db):
+    def _make(count, *, stock, at=EVENT_START, step=timedelta(seconds=1), **fields):
+        rows = [
+            StockEvent(**_event_values(stock, at + step * i, fields))
+            for i in range(count)
+        ]
+        StockEvent.objects.bulk_create(rows, batch_size=1000)
+        return rows
+
+    return _make

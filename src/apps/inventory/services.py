@@ -6,7 +6,7 @@ update, and appends the event, so the two can never disagree (FR-024, I4).
 """
 
 from django.db import DatabaseError
-from django.db.models import F, Q
+from django.db.models import Count, F, Q, Sum
 from django.utils import timezone
 from django_mongodb_backend.transaction import atomic
 from rest_framework import serializers
@@ -86,6 +86,46 @@ def enrich(rows) -> dict:
         "thresholds": product_thresholds(product_ids),
         "store_names": store_names([row.store_id for row in rows]),
     }
+
+
+def event_scope(actor, store_id=None, product_id=None):
+    """Every event the actor may see, newest first, optionally for one item.
+
+    The store rule is the stock list's, reused rather than repeated (R5). The
+    queryset is returned unsliced so a report can aggregate and page on it.
+    """
+    queryset = stock_scope(StockEvent.objects.all(), actor, store_id)
+    if product_id is not None:
+        queryset = queryset.filter(product_id=product_id)
+    return queryset.order_by("-at", "-id")
+
+
+def enrich_events(events, more_product_ids=()) -> dict:
+    """The lookups one page of events needs, batched after pagination.
+
+    ``more_product_ids`` lets the report resolve the totals table in the same
+    batch as the page rows. Thresholds are never fetched (R9).
+    """
+    rows = list(events)
+    product_ids = {row.product_id for row in rows}
+    product_ids.update(more_product_ids)
+    return {
+        "labels": product_labels(product_ids),
+        "store_names": store_names([row.store_id for row in rows]),
+    }
+
+
+def waste_totals(queryset) -> list:
+    """One row per item: exact total wasted and how many events.
+
+    The queryset is already filtered by scope, kind, type, range, and item, and
+    is unsliced, so the answer covers the whole window rather than one page (R1).
+    """
+    return list(
+        queryset.values("product_id")
+        .annotate(total=Sum("quantity"), events=Count("id"))
+        .order_by("-total", "product_id")
+    )
 
 
 def record_movement(actor, data: dict) -> StockEvent:
